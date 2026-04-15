@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nihongo Quest - RPG de Vocabulário</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/wanakana/5.0.2/wanakana.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Press Start 2P', cursive;
+            background-color: #1a202c;
+            color: #e2e8f0;
+            user-select: none;
+        }
+
+        /* Retro UI Elements */
+        .retro-panel {
+            background-color: #2d3748;
+            border: 4px solid #718096;
+            border-radius: 8px;
+            box-shadow: inset -4px -4px 0px 0px rgba(0,0,0,0.3);
+        }
+
+        .retro-input {
+            background-color: #1a202c;
+            border: 2px solid #4a5568;
+            color: #68d391;
+            outline: none;
+            text-transform: lowercase;
+        }
+
+        .retro-input:focus {
+            border-color: #68d391;
+        }
+
+        .retro-btn {
+            background-color: #4a5568;
+            border: 2px solid #718096;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        .retro-btn:hover {
+            background-color: #718096;
+        }
+        
+        .retro-btn:active {
+            transform: translateY(2px);
+            box-shadow: none;
+        }
+
+        /* Health Bar Transitions */
+        .hp-fill {
+            transition: width 0.3s ease-in-out, background-color 0.3s;
+        }
+
+        /* Animations */
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-8px); filter: brightness(1.5) hue-rotate(320deg); }
+            50% { transform: translateX(8px); }
+            75% { transform: translateX(-8px); filter: brightness(1.5) hue-rotate(320deg); }
+            100% { transform: translateX(0); }
+        }
+        .anim-damage {
+            animation: shake 0.4s;
+        }
+
+        @keyframes attack-right {
+            0% { transform: translateX(0); }
+            40% { transform: translateX(40px); }
+            50% { transform: translateX(40px) scale(1.1); }
+            100% { transform: translateX(0); }
+        }
+        .anim-attack-p {
+            animation: attack-right 0.3s forwards;
+        }
+
+        @keyframes attack-left {
+            0% { transform: translateX(0); }
+            40% { transform: translateX(-40px); }
+            50% { transform: translateX(-40px) scale(1.1); }
+            100% { transform: translateX(0); }
+        }
+        .anim-attack-m {
+            animation: attack-left 0.3s forwards;
+        }
+
+        @keyframes heal {
+            0% { filter: brightness(1); transform: translateY(0); }
+            50% { filter: brightness(1.5) hue-rotate(90deg); transform: translateY(-10px); }
+            100% { filter: brightness(1); transform: translateY(0); }
+        }
+        .anim-heal {
+            animation: heal 0.5s forwards;
+        }
+
+        /* Grimório UI */
+        .spellbook-section {
+            border: 2px solid;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            background-color: #1a202c;
+        }
+        
+        .spellbook-header {
+            padding: 8px;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            border-bottom: 2px solid;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .spellbook-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .spellbook-table th, .spellbook-table td {
+            padding: 10px;
+            border-bottom: 1px solid #2d3748;
+            text-align: left;
+            vertical-align: top;
+        }
+        
+        .spellbook-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .locked-spell {
+            opacity: 0.5;
+            background-color: rgba(0, 0, 0, 0.4);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1a202c; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4a5568; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #718096; 
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+    <div class="max-w-3xl w-full flex flex-col gap-4">
+        
+        <!-- Header / Status -->
+        <div class="retro-panel p-4 text-center">
+            <h1 class="text-xl md:text-2xl text-yellow-400 text-shadow mb-2">Nihongo Quest</h1>
+            <p class="text-xs text-gray-400">Derrote monstros com Japonês. Suba de nível para liberar magias fortes!</p>
+        </div>
+
+        <!-- Battle Screen -->
+        <div class="retro-panel p-6 flex justify-between items-end relative min-h-[250px] bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+PGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iMSIgZmlsbD0iIzRBNTU2OCIvPjwvc3ZnPg==')] bg-repeat">
+            
+            <!-- Player -->
+            <div id="player" class="flex flex-col items-center z-10 w-1/3">
+                <div class="relative w-full">
+                    <div id="player-status" class="absolute -top-6 right-0 flex gap-1 z-20 text-sm"></div>
+                    <div class="w-full bg-gray-900 border-2 border-gray-600 h-6 mb-2 rounded overflow-hidden relative">
+                        <div id="player-hp-bar" class="hp-fill h-full bg-green-500 w-full"></div>
+                        <span id="player-hp-text" class="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white text-shadow">100/100</span>
+                    </div>
+                </div>
+                <div class="text-[10px] md:text-xs mb-2 font-bold text-blue-300">VOCÊ (Nv. <span id="player-level">1</span>)</div>
+                <div id="player-sprite" class="text-6xl md:text-8xl drop-shadow-lg transition-transform">🧙‍♂️</div>
+            </div>
+
+            <!-- VS Badge -->
+            <div class="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 text-2xl text-red-500 font-bold opacity-30 z-0">VS</div>
+
+            <!-- Monster -->
+            <div id="monster" class="flex flex-col items-center z-10 w-1/3">
+                <div class="relative w-full">
+                    <div id="monster-status" class="absolute -top-6 left-0 flex gap-1 z-20 text-sm"></div>
+                    <div class="w-full bg-gray-900 border-2 border-gray-600 h-6 mb-2 rounded overflow-hidden relative">
+                        <div id="monster-hp-bar" class="hp-fill h-full bg-red-500 w-full"></div>
+                        <span id="monster-hp-text" class="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white text-shadow">50/50</span>
+                    </div>
+                </div>
+                <div id="monster-name" class="text-[10px] md:text-xs mb-2 font-bold text-red-400">Slime</div>
+                <div id="monster-sprite" class="text-6xl md:text-8xl drop-shadow-lg transition-transform">💧</div>
+            </div>
+
+        </div>
+
+        <!-- Action Panel -->
+        <div class="retro-panel p-4 flex flex-col md:flex-row gap-4">
+            
+            <!-- Input Area -->
+            <div class="flex-1 flex flex-col gap-3">
+                <div class="bg-gray-800 p-3 border border-gray-600 rounded flex justify-between items-start">
+                    <div>
+                        <p class="text-xs text-gray-400 mb-1">O que você vai fazer?</p>
+                        <p id="vocab-prompt" class="text-sm text-yellow-300">Digite uma magia (Romaji ou Kana)</p>
+                    </div>
+                    <button onclick="openSpellbook()" class="retro-btn px-3 py-2 rounded text-[10px] text-yellow-300 flex items-center gap-2 border-yellow-600 shadow-md">
+                        <span class="text-base">📖</span> GRIMÓRIO
+                    </button>
+                </div>
+                
+                <div class="flex gap-2">
+                    <input type="text" id="answer-input" autocomplete="off" placeholder="romaji..." 
+                           class="retro-input flex-1 p-3 rounded text-sm md:text-base uppercase font-bold tracking-widest"
+                           onkeypress="handleKeyPress(event)">
+                    <button id="attack-btn" onclick="submitAnswer()" class="retro-btn px-4 rounded text-xs md:text-sm text-white font-bold">CONJURAR</button>
+                </div>
+                
+                <!-- Barra Rápida de Cooldowns -->
+                <div id="cooldown-container" class="mt-1 p-2 bg-black border-2 border-gray-700 rounded text-[10px] md:text-xs min-h-[42px] flex flex-wrap gap-2 items-center">
+                    <span class="text-gray-600 italic">Todas magias prontas</span>
+                </div>
+            </div>
+
+            <!-- Battle Log -->
+            <div class="flex-1 bg-black border-2 border-gray-700 rounded p-3 h-32 overflow-y-auto flex flex-col gap-1 leading-relaxed" id="battle-log">
+                <div class="text-[10px] text-green-400">> Um Slime selvagem apareceu!</div>
+                <div class="text-[10px] text-gray-400">> Prepare sua magia...</div>
+            </div>
+
+        </div>
+        
+        <!-- Game Over / Victory Screen -->
+        <div id="overlay" class="fixed inset-0 bg-black bg-opacity-90 hidden items-center justify-center z-50 p-4">
+            <div class="retro-panel p-8 text-center max-w-md w-full">
+                <h2 id="overlay-title" class="text-3xl mb-4 text-red-500">GAME OVER</h2>
+                <p id="overlay-desc" class="text-sm text-gray-300 mb-6 leading-relaxed">Você foi derrotado. Estude mais e tente novamente!</p>
+                <div class="text-xs text-yellow-400 mb-6" id="final-score">Monstros derrotados: 0</div>
+                <button onclick="restartGame()" class="retro-btn w-full py-4 text-white font-bold tracking-widest">TENTAR NOVAMENTE</button>
+            </div>
+        </div>
+
+        <!-- Spellbook (Grimório) Overlay -->
+        <div id="spellbook-overlay" class="fixed inset-0 bg-black bg-opacity-95 hidden items-center justify-center z-50 p-4 md:p-8">
+            <div class="retro-panel p-4 md:p-6 w-full max-w-4xl h-[90vh] flex flex-col bg-gray-900 border-gray-500 border-4">
+                <div class="flex justify-between items-center mb-4 border-b-2 border-gray-600 pb-4">
+                    <div>
+                        <h2 class="text-xl md:text-2xl text-yellow-400 drop-shadow-md">📖 Grimório Arcano</h2>
+                        <p class="text-[10px] text-gray-400 mt-1">Seu Nível Atual: <span id="spellbook-level" class="text-white font-bold">1</span></p>
+                    </div>
+                    <button onclick="closeSpellbook()" class="retro-btn px-4 py-2 text-red-400 hover:text-white border-red-800">FECHAR</button>
+                </div>
+                
+                <div class="overflow-y-auto flex-1 pr-2 pb-4 flex flex-col gap-4" id="spellbook-content">
+                    <!-- Preenchido via JS, organizado por elementos -->
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- Sistema de Elementos para o Grimório ---
+        const elementsInfo = {
+            fire: { name: 'Fogo', icon: '🔥', color: '#f56565', bg: '#742a2a' },
+            water: { name: 'Água & Gelo', icon: '❄️', color: '#63b3ed', bg: '#2a4365' },
+            thunder: { name: 'Trovão', icon: '⚡', color: '#f6e05e', bg: '#744210' },
+            physical: { name: 'Físico', icon: '⚔️', color: '#a0aec0', bg: '#2d3748' },
+            light: { name: 'Luz & Cura', icon: '✨', color: '#68d391', bg: '#22543d' },
+            arcane: { name: 'Arcano', icon: '🔮', color: '#b794f4', bg: '#44337a' }
+        };
+
+        const statusIcons = { burn: '🔥', bleed: '🩸', freeze: '❄️', paralyze: '⚡', weaken: '💧', shield: '🛡️', regen: '✨', poison: '🤢', blind: '👁️' };
+        const statusNamesPt = { burn: 'Queimadura', bleed: 'Sangramento', freeze: 'Congelamento', paralyze: 'Paralisia', weaken: 'Fraqueza', shield: 'Escudo', regen: 'Regeneração', poison: 'Veneno', blind: 'Cegueira' };
+
+        // --- Dicionário Expandido com Progressão de Nível ---
+        const vocabulary = [
+            // Nível 1
+            { pt: "Fogo", romaji: "hi", kana: "ひ", kanji: "火", power: 35, type: "attack", element: 'fire', unlockLevel: 1, cooldown: 2, currentCooldown: 0, effect: 'burn', effectChance: 0.20, effectDuration: 2, effectTarget: 'enemy' },
+            { pt: "Água", romaji: "mizu", kana: "みず", kanji: "水", power: 30, type: "attack", element: 'water', unlockLevel: 1, cooldown: 2, currentCooldown: 0, effect: 'weaken', effectChance: 0.20, effectDuration: 2, effectTarget: 'enemy' },
+            { pt: "Espada", romaji: "ken", kana: "けん", kanji: "剣", power: 25, type: "attack", element: 'physical', unlockLevel: 1, cooldown: 0, currentCooldown: 0, scaling: 'low' },
+            { pt: "Defesa", romaji: "bougyo", kana: "ぼうぎょ", kanji: "防御", power: 10, type: "heal", element: 'light', unlockLevel: 1, cooldown: 3, currentCooldown: 0, effect: 'shield', effectChance: 1.0, effectDuration: 2, effectTarget: 'self' },
+            
+            // Nível 2
+            { pt: "Vento", romaji: "kaze", kana: "かぜ", kanji: "風", power: 30, type: "attack", element: 'arcane', unlockLevel: 2, cooldown: 1, currentCooldown: 0 },
+            { pt: "Corte", romaji: "kiri", kana: "きり", kanji: "切り", power: 45, type: "attack", element: 'physical', unlockLevel: 2, cooldown: 3, currentCooldown: 0, effect: 'bleed', effectChance: 0.25, effectDuration: 3, effectTarget: 'enemy' },
+            { pt: "Cura", romaji: "kaifuku", kana: "かいふく", kanji: "回復", power: 60, type: "heal", element: 'light', unlockLevel: 2, cooldown: 5, currentCooldown: 0, effect: 'regen', effectChance: 1.0, effectDuration: 3, effectTarget: 'self' },
+            
+            // Nível 3
+            { pt: "Terra", romaji: "tsuchi", kana: "つち", kanji: "土", power: 40, type: "attack", element: 'physical', unlockLevel: 3, cooldown: 2, currentCooldown: 0, effect: 'weaken', effectChance: 0.15, effectDuration: 2, effectTarget: 'enemy' },
+            { pt: "Gelo", romaji: "koori", kana: "こおり", kanji: "氷", power: 50, type: "attack", element: 'water', unlockLevel: 3, cooldown: 4, currentCooldown: 0, effect: 'freeze', effectChance: 0.15, effectDuration: 1, effectTarget: 'enemy' },
+            { pt: "Raio", romaji: "kaminari", kana: "かみなり", kanji: "雷", power: 60, type: "attack", element: 'thunder', unlockLevel: 3, cooldown: 4, currentCooldown: 0, effect: 'paralyze', effectChance: 0.15, effectDuration: 1, effectTarget: 'enemy' },
+            
+            // Nível 4
+            { pt: "Luz", romaji: "hikari", kana: "ひかり", kanji: "光", power: 55, type: "attack", element: 'light', unlockLevel: 4, cooldown: 3, currentCooldown: 0 },
+            { pt: "Estocada", romaji: "tsuki", kana: "つき", kanji: "突き", power: 65, type: "attack", element: 'physical', unlockLevel: 4, cooldown: 3, currentCooldown: 0 },
+            { pt: "Magia", romaji: "mahou", kana: "まほう", kanji: "魔法", power: 80, type: "attack", element: 'arcane', unlockLevel: 4, cooldown: 5, currentCooldown: 0 },
+            
+            // Nível 5
+            { pt: "Escuridão", romaji: "yami", kana: "やみ", kanji: "闇", power: 75, type: "attack", element: 'arcane', unlockLevel: 5, cooldown: 4, currentCooldown: 0, effect: 'bleed', effectChance: 0.20, effectDuration: 3, effectTarget: 'enemy' },
+            { pt: "Magia de Fogo", romaji: "honoo no mahou", kana: "ほのおのまほう", kanji: "炎の魔法", power: 120, type: "attack", element: 'fire', unlockLevel: 5, cooldown: 5, currentCooldown: 0, effect: 'burn', effectChance: 0.40, effectDuration: 3, effectTarget: 'enemy' },
+            
+            // Nível 6
+            { pt: "Dragão de Gelo", romaji: "koori no ryuu", kana: "こおりのりゅう", kanji: "氷の竜", power: 150, type: "attack", element: 'water', unlockLevel: 6, cooldown: 6, currentCooldown: 0, effect: 'freeze', effectChance: 0.35, effectDuration: 2, effectTarget: 'enemy' },
+            
+            // Nível 7
+            { pt: "Tempestade de Raios", romaji: "kaminari no arashi", kana: "かみなりのあらし", kanji: "雷の嵐", power: 160, type: "attack", element: 'thunder', unlockLevel: 7, cooldown: 6, currentCooldown: 0, effect: 'paralyze', effectChance: 0.30, effectDuration: 1, effectTarget: 'enemy' },
+            { pt: "Grande Espada", romaji: "ootachi", kana: "おおたち", kanji: "大太刀", power: 130, type: "attack", element: 'physical', unlockLevel: 7, cooldown: 4, currentCooldown: 0, effect: 'bleed', effectChance: 0.40, effectDuration: 4, effectTarget: 'enemy' },
+            
+            // Nível 8
+            { pt: "Escudo de Gelo", romaji: "koori no tate", kana: "こおりのたて", kanji: "氷の盾", power: 100, type: "heal", element: 'water', unlockLevel: 8, cooldown: 6, currentCooldown: 0, effect: 'shield', effectChance: 1.0, effectDuration: 4, effectTarget: 'self' },
+            { pt: "Cura Suprema", romaji: "kanzen kaifuku", kana: "かんぜんかいふく", kanji: "完全回復", power: 500, type: "heal", element: 'light', unlockLevel: 8, cooldown: 8, currentCooldown: 0, effect: 'regen', effectChance: 1.0, effectDuration: 5, effectTarget: 'self' },
+            
+            // Nível 9
+            { pt: "Ataque Devastador", romaji: "hakai no kougeki", kana: "はかいのこうげき", kanji: "破壊の攻撃", power: 300, type: "attack", element: 'arcane', unlockLevel: 9, cooldown: 8, currentCooldown: 0 },
+            
+            // Nível 10
+            { pt: "Magia de Criação", romaji: "souzou no mahou", kana: "そうぞうのまほう", kanji: "創造の魔法", power: 200, type: "heal", element: 'light', unlockLevel: 10, cooldown: 10, currentCooldown: 0, effect: 'shield', effectChance: 1.0, effectDuration: 5, effectTarget: 'self' },
+
+            // Nível 11
+            { pt: "Inferno", romaji: "jigoku", kana: "じごく", kanji: "地獄", power: 400, type: "attack", element: 'fire', unlockLevel: 11, cooldown: 7, currentCooldown: 0, effect: 'burn', effectChance: 0.50, effectDuration: 4, effectTarget: 'enemy' },
+            
+            // Nível 12
+            { pt: "Espada Sagrada", romaji: "seiken", kana: "せいけん", kanji: "聖剣", power: 450, type: "attack", element: 'physical', unlockLevel: 12, cooldown: 5, currentCooldown: 0 },
+            
+            // Nível 14
+            { pt: "Dragão das Trevas", romaji: "yami no ryuu", kana: "やみのりゅう", kanji: "闇の竜", power: 600, type: "attack", element: 'arcane', unlockLevel: 14, cooldown: 8, currentCooldown: 0, effect: 'freeze', effectChance: 0.30, effectDuration: 2, effectTarget: 'enemy' },
+            
+            // Nível 16
+            { pt: "Julgamento Divino", romaji: "kami no sabaki", kana: "かみのさばき", kanji: "神の裁き", power: 800, type: "attack", element: 'light', unlockLevel: 16, cooldown: 10, currentCooldown: 0, effect: 'paralyze', effectChance: 0.50, effectDuration: 2, effectTarget: 'enemy' }
+        ];
+
+        // --- Habilidades dos Inimigos (As 10 Diferentes) ---
+        const enemySkillsPool = {
+            'heal': { name: 'Cura Regenerativa', type: 'heal', mult: 0.2 }, // Cura 20% do Max HP
+            'burn': { name: 'Sopro de Fogo Infernal', type: 'status', effect: 'burn', duration: 3 },
+            'poison': { name: 'Névoa Venenosa', type: 'status', effect: 'poison', duration: 4 },
+            'paralyze': { name: 'Olhar Eletrizante', type: 'status', effect: 'paralyze', duration: 1 },
+            'weaken': { name: 'Maldição da Fraqueza', type: 'status', effect: 'weaken', duration: 3 },
+            'shield': { name: 'Pele de Ferro', type: 'status', effect: 'shield', duration: 3 },
+            'lifesteal': { name: 'Drenar Vida', type: 'lifesteal', mult: 1.0 }, // Dano curado
+            'critical': { name: 'Ataque Brutal', type: 'attack', mult: 2.0 }, // Dano Duplo
+            'summon': { name: 'Invocar Lacaio', type: 'summon', mult: 0.3 }, // Ganha escudo de HP 30%
+            'blind': { name: 'Cegueira Obscura', type: 'status', effect: 'blind', duration: 2 }
+        };
+
+        // --- Lista Expandida de 16 Monstros ---
+        const monstersList = [
+            { name: "Slime", emoji: "💧", hp: 120, attack: 15, color: "text-blue-300", skills: ['weaken'] },
+            { name: "Rato Gigante", emoji: "🐀", hp: 250, attack: 25, color: "text-gray-400", skills: ['poison'] },
+            { name: "Lobo Selvagem", emoji: "🐺", hp: 450, attack: 40, color: "text-gray-500", skills: ['critical'] },
+            { name: "Goblin", emoji: "👺", hp: 700, attack: 60, color: "text-green-400", skills: ['poison', 'lifesteal'] },
+            { name: "Esqueleto", emoji: "💀", hp: 1000, attack: 80, color: "text-gray-200", skills: ['shield'] },
+            { name: "Fantasminha", emoji: "👻", hp: 1400, attack: 110, color: "text-purple-300", skills: ['blind', 'weaken'] },
+            { name: "Zumbi", emoji: "🧟", hp: 1900, attack: 150, color: "text-green-600", skills: ['poison', 'lifesteal'] },
+            { name: "Ogro", emoji: "👹", hp: 2500, attack: 200, color: "text-red-400", skills: ['critical', 'shield'] },
+            { name: "Golem de Pedra", emoji: "🪨", hp: 3500, attack: 260, color: "text-gray-400", skills: ['shield', 'paralyze'] },
+            { name: "Mago Negro", emoji: "🧙‍♂️", hp: 4500, attack: 350, color: "text-purple-500", skills: ['burn', 'blind', 'heal'] },
+            { name: "Orc Guerreiro", emoji: "🧌", hp: 6000, attack: 450, color: "text-green-700", skills: ['critical', 'summon'] },
+            { name: "Quimera", emoji: "🦁", hp: 8000, attack: 550, color: "text-yellow-600", skills: ['burn', 'poison', 'paralyze'] },
+            { name: "Cavaleiro das Trevas", emoji: "🤺", hp: 10000, attack: 700, color: "text-gray-700", skills: ['lifesteal', 'shield', 'blind'] },
+            { name: "Dragão", emoji: "🐉", hp: 14000, attack: 900, color: "text-red-500", skills: ['burn', 'critical', 'summon'] },
+            { name: "Dragão Ancião", emoji: "🦖", hp: 20000, attack: 1200, color: "text-green-800", skills: ['burn', 'paralyze', 'heal', 'summon'] },
+            { name: "Rei Demônio", emoji: "👾", hp: 35000, attack: 1800, color: "text-purple-600", skills: ['blind', 'lifesteal', 'summon', 'heal', 'critical'] }
+        ];
+
+        // --- Estado do Jogo ---
+        let player = { maxHp: 150, hp: 150, level: 1, monstersDefeated: 0, statuses: [] };
+        let currentMonster = null;
+        let monsterIndex = 0;
+        let currentVocab = null;
+        let isAnimating = false;
+
+        // --- Elementos da UI ---
+        const ui = {
+            pHpBar: document.getElementById('player-hp-bar'),
+            pHpText: document.getElementById('player-hp-text'),
+            pSprite: document.getElementById('player-sprite'),
+            pLevel: document.getElementById('player-level'),
+            mHpBar: document.getElementById('monster-hp-bar'),
+            mHpText: document.getElementById('monster-hp-text'),
+            mSprite: document.getElementById('monster-sprite'),
+            mName: document.getElementById('monster-name'),
+            prompt: document.getElementById('vocab-prompt'),
+            input: document.getElementById('answer-input'),
+            log: document.getElementById('battle-log'),
+            btn: document.getElementById('attack-btn'),
+            overlay: document.getElementById('overlay'),
+            overlayTitle: document.getElementById('overlay-title'),
+            overlayDesc: document.getElementById('overlay-desc'),
+            finalScore: document.getElementById('final-score'),
+            spellbookOverlay: document.getElementById('spellbook-overlay'),
+            spellbookContent: document.getElementById('spellbook-content'),
+            spellbookLevel: document.getElementById('spellbook-level'),
+            cooldownContainer: document.getElementById('cooldown-container')
+        };
+
+        // --- Funções Principais ---
+
+        function initGame() {
+            vocabulary.forEach(v => v.currentCooldown = 0);
+
+            try {
+                if (window.wanakana && !ui.input.hasAttribute('data-wanakana')) {
+                    wanakana.bind(ui.input);
+                    ui.input.setAttribute('data-wanakana', 'true');
+                }
+            } catch (error) {
+                console.warn("Aviso: Conversor de Kana não carregou. O jogo aceitará os ataques em Romaji.");
+            }
+
+            player = { maxHp: 150, hp: 150, level: 1, monstersDefeated: 0, statuses: [] };
+            monsterIndex = 0;
+            ui.log.innerHTML = '';
+            ui.overlay.classList.add('hidden');
+            ui.overlay.classList.remove('flex');
+            ui.pLevel.innerText = player.level;
+            
+            renderSpellbook();
+            renderCooldowns();
+            updatePlayerUI();
+            renderStatuses();
+            spawnMonster();
+            nextTurn();
+        }
+
+        function spawnMonster() {
+            if (monsterIndex >= monstersList.length) {
+                showVictory();
+                return;
+            }
+            const template = monstersList[monsterIndex];
+            currentMonster = { 
+                ...template, 
+                maxHp: template.hp,
+                statuses: []
+            };
+            
+            player.statuses = []; // Limpa status
+            renderStatuses();
+
+            ui.mName.innerText = currentMonster.name;
+            ui.mName.className = `text-[10px] md:text-xs mb-2 font-bold ${currentMonster.color}`;
+            ui.mSprite.innerText = currentMonster.emoji;
+            
+            updateMonsterUI();
+            addLog(`Um ${currentMonster.name} apareceu!`, 'text-yellow-400');
+        }
+
+        function nextTurn() {
+            renderSpellbook();
+            renderCooldowns();
+            ui.input.value = '';
+            ui.input.focus();
+        }
+
+        function renderCooldowns() {
+            // Filtra as magias desbloqueadas que estão com recarga maior que 0
+            const onCooldown = vocabulary.filter(v => player.level >= v.unlockLevel && v.currentCooldown > 0);
+            
+            if (onCooldown.length === 0) {
+                ui.cooldownContainer.innerHTML = '<span class="text-gray-600 italic">Todas as magias estão prontas</span>';
+                return;
+            }
+
+            ui.cooldownContainer.innerHTML = onCooldown.map(v => {
+                return `<span class="bg-gray-800 border border-orange-900 text-orange-300 px-2 py-1 rounded drop-shadow">
+                    ${v.pt} <span class="font-bold text-orange-400">⏳${v.currentCooldown}</span>
+                </span>`;
+            }).join('');
+        }
+
+        function getEffectDesc(vocab) {
+            if (!vocab.effect) return '';
+            const chanceStr = `${Math.round(vocab.effectChance * 100)}% chance de `;
+            const mapDesc = {
+                'burn': 'Queimar (dano)', 'bleed': 'Sangrar (dano)', 'freeze': 'Congelar (pula turno)',
+                'paralyze': 'Paralisar (pula turno)', 'weaken': 'Enfraquecer',
+                'shield': 'Proteger (1/2 dano)', 'regen': 'Regenerar (cura/t)'
+            };
+            return `<div class="text-[8px] md:text-[10px] mt-1 opacity-80 text-white font-normal tracking-normal">✧ ${chanceStr}${mapDesc[vocab.effect]} (${vocab.effectDuration}t)</div>`;
+        }
+
+        function renderSpellbook() {
+            ui.spellbookContent.innerHTML = '';
+            ui.spellbookLevel.innerText = player.level;
+
+            // Agrupa os feitiços por elemento
+            const grouped = {};
+            vocabulary.forEach(v => {
+                if (!grouped[v.element]) grouped[v.element] = [];
+                grouped[v.element].push(v);
+            });
+
+            // Renderiza cada seção
+            for (const key in elementsInfo) {
+                if (!grouped[key]) continue;
+                
+                const elInfo = elementsInfo[key];
+                const section = document.createElement('div');
+                section.className = 'spellbook-section';
+                section.style.borderColor = elInfo.color;
+
+                const header = document.createElement('div');
+                header.className = 'spellbook-header';
+                header.style.backgroundColor = elInfo.bg;
+                header.style.color = elInfo.color;
+                header.style.borderColor = elInfo.color;
+                header.innerHTML = `<span>${elInfo.icon}</span> <span class="font-bold tracking-widest">${elInfo.name}</span>`;
+                section.appendChild(header);
+
+                const table = document.createElement('table');
+                table.className = 'spellbook-table text-[10px] md:text-xs text-gray-300';
+                
+                grouped[key].forEach(vocab => {
+                    const tr = document.createElement('tr');
+                    const isUnlocked = player.level >= vocab.unlockLevel;
+                    
+                    if (isUnlocked) {
+                        let cdStatus = '<span class="text-green-400 text-[8px] bg-green-900 bg-opacity-40 px-1 rounded">PRONTO</span>';
+                        if (vocab.currentCooldown > 0) {
+                            cdStatus = `<span class="text-orange-400 text-[8px] bg-orange-900 bg-opacity-40 px-1 rounded">⏳ ${vocab.currentCooldown} turnos</span>`;
+                        }
+
+                        // Remove espaços e lida com frases longas no input placeholder
+                        const displayRomaji = vocab.romaji;
+                        const typeColor = vocab.type === 'heal' ? 'text-green-300' : 'text-white';
+
+                        tr.innerHTML = `
+                            <td class="w-1/3">
+                                <div class="font-bold ${typeColor} drop-shadow-sm text-xs md:text-sm mb-1">${vocab.pt}</div>
+                                ${cdStatus}
+                                ${getEffectDesc(vocab)}
+                            </td>
+                            <td class="w-1/3 text-gray-400 tracking-wider font-mono">${displayRomaji}</td>
+                            <td class="w-1/3 text-yellow-100">
+                                <div class="text-sm md:text-lg">${vocab.kana}</div>
+                                <div class="text-[8px] md:text-[10px] text-gray-500">${vocab.kanji}</div>
+                            </td>
+                        `;
+                    } else {
+                        // Feitiço Bloqueado
+                        tr.className = 'locked-spell';
+                        tr.innerHTML = `
+                            <td class="w-1/3 text-gray-500 font-bold">🔒 ?????</td>
+                            <td class="w-1/3 text-gray-600 italic text-[8px] md:text-[10px]">Desbloqueia no Nível ${vocab.unlockLevel}</td>
+                            <td class="w-1/3 text-gray-600">???</td>
+                        `;
+                    }
+                    table.appendChild(tr);
+                });
+
+                section.appendChild(table);
+                ui.spellbookContent.appendChild(section);
+            }
+        }
+
+        function openSpellbook() {
+            renderSpellbook(); // Atualiza cooldowns visualmente antes de abrir
+            ui.spellbookOverlay.classList.remove('hidden');
+            ui.spellbookOverlay.classList.add('flex');
+        }
+
+        function closeSpellbook() {
+            ui.spellbookOverlay.classList.add('hidden');
+            ui.spellbookOverlay.classList.remove('flex');
+            ui.input.focus();
+        }
+
+        function handleKeyPress(e) {
+            if (e.key === 'Enter') submitAnswer();
+        }
+
+        function advanceCooldowns(usedSpell) {
+            vocabulary.forEach(v => {
+                if (v.currentCooldown > 0) v.currentCooldown--;
+            });
+            usedSpell.currentCooldown = usedSpell.cooldown;
+            renderCooldowns();
+        }
+
+        async function submitAnswer() {
+            if (isAnimating) return;
+            const answerRaw = ui.input.value.trim().toLowerCase();
+            // Permite que o jogador digite com ou sem espaços
+            const answer = answerRaw.replace(/\s+/g, ''); 
+            
+            if (!answer) return;
+
+            // Procura a magia ignorando espaços na digitação e no vocabulário
+            const spell = vocabulary.find(v => {
+                const romajiNoSpace = v.romaji.replace(/\s+/g, '');
+                return answer === romajiNoSpace || answer === v.kana || answer === v.kanji;
+            });
+
+            if (!spell || player.level < spell.unlockLevel) {
+                isAnimating = true;
+                ui.btn.disabled = true; ui.input.disabled = true;
+                
+                if (spell && player.level < spell.unlockLevel) {
+                    addLog(`Magia muito avançada! Requer nível ${spell.unlockLevel}.`, 'text-red-400');
+                } else {
+                    addLog(`Magia desconhecida: "${answerRaw}"!`, 'text-red-400');
+                }
+                
+                ui.input.classList.add('border-red-500');
+                await delay(800);
+                ui.input.classList.remove('border-red-500');
+                
+                await monsterTurn(); // Punição
+                
+                ui.btn.disabled = false; ui.input.disabled = false; isAnimating = false;
+                if (player.hp > 0 && currentMonster.hp > 0) nextTurn();
+                return;
+            }
+
+            if (spell.currentCooldown > 0) {
+                addLog(`A magia ${spell.pt} está recarregando! (${spell.currentCooldown} turnos)`, 'text-yellow-500');
+                ui.input.value = '';
+                return; 
+            }
+
+            isAnimating = true;
+            ui.btn.disabled = true; ui.input.disabled = true;
+            currentVocab = spell;
+            
+            addLog(`Você conjurou ${currentVocab.pt}!`, 'text-blue-300');
+            advanceCooldowns(spell);
+
+            await processStatuses(player, true);
+            if (player.hp <= 0) {
+                showGameOver();
+                return;
+            }
+
+            let isDead = false;
+            
+            // Calcula chance de erro com base na Cegueira
+            let currentMissChance = 0.10; // 10% chance base de errar
+            if (player.statuses.some(s => s.type === 'blind')) {
+                currentMissChance = 0.50; // 50% de chance se estiver cego
+            }
+
+            const missChance = Math.random();
+            if (currentVocab.type === 'attack' && missChance < currentMissChance) {
+                if (currentMissChance > 0.10) {
+                    addLog(`Sua visão está prejudicada! O feitiço falhou (Cegueira)!`, 'text-gray-400 font-bold');
+                } else {
+                    addLog(`Oh não! O feitiço falhou (Errou o alvo)!`, 'text-gray-400');
+                }
+                await delay(1000);
+            } else {
+                isDead = await playerAction();
+            }
+
+            if (!isDead && currentMonster.hp > 0) {
+                await monsterTurn();
+            }
+
+            ui.btn.disabled = false; ui.input.disabled = false; isAnimating = false;
+            if (player.hp > 0 && currentMonster.hp > 0) nextTurn();
+        }
+
+        async function playerAction() {
+            if (currentVocab.type === 'heal') {
+                ui.pSprite.classList.add('anim-heal');
+                
+                const healAmount = currentVocab.power + (player.level * 25); 
+                player.hp = Math.min(player.maxHp, player.hp + healAmount);
+                addLog(`Você recuperou ${healAmount} de vida!`, 'text-green-400');
+                updatePlayerUI();
+                await delay(500);
+                ui.pSprite.classList.remove('anim-heal');
+            } else {
+                ui.pSprite.classList.add('anim-attack-p');
+                await delay(150);
+                ui.mSprite.classList.add('anim-damage');
+                
+                // Dano Base escala menos para aumentar a dificuldade e "Espada" escala bem menos (Balanceamento)
+                let scalingFactor = currentVocab.scaling === 'low' ? (player.level * 5) : (player.level * player.level * 5);
+                let damage = currentVocab.power + scalingFactor;
+                damage *= getAtkMultiplier(player); 
+                damage *= getDefMultiplier(currentMonster); 
+                damage = Math.floor(damage);
+                
+                currentMonster.hp = Math.max(0, currentMonster.hp - damage);
+                addLog(`Causou ${damage} de dano!`, 'text-white');
+                updateMonsterUI();
+                
+                await delay(300);
+                ui.pSprite.classList.remove('anim-attack-p');
+                ui.mSprite.classList.remove('anim-damage');
+            }
+
+            if (currentVocab.effect && Math.random() < currentVocab.effectChance) {
+                const target = currentVocab.effectTarget === 'self' ? player : currentMonster;
+                applyStatus(target, currentVocab.effect, currentVocab.effectDuration);
+                const targetName = currentVocab.effectTarget === 'self' ? 'Você' : currentMonster.name;
+                addLog(`${targetName} recebeu ${statusNamesPt[currentVocab.effect]}!`, 'text-purple-400');
+            }
+
+            await delay(500);
+            return await checkMonsterDeath();
+        }
+
+        async function monsterTurn() {
+            if (currentMonster.hp <= 0) return;
+
+            const canAct = await processStatuses(currentMonster, false);
+            const isDead = await checkMonsterDeath();
+            if (isDead) return;
+
+            if (canAct) {
+                // Decide se usa habilidade especial (30% de chance se tiver skills)
+                let usedSkill = null;
+                if (currentMonster.skills && currentMonster.skills.length > 0 && Math.random() < 0.30) {
+                    const randomSkillKey = currentMonster.skills[Math.floor(Math.random() * currentMonster.skills.length)];
+                    usedSkill = enemySkillsPool[randomSkillKey];
+                }
+
+                if (usedSkill) {
+                    addLog(`O ${currentMonster.name} usou 【${usedSkill.name}】!`, 'text-orange-400 font-bold');
+                } else {
+                    addLog(`O ${currentMonster.name} ataca!`, 'text-orange-400');
+                }
+
+                ui.mSprite.classList.add('anim-attack-m');
+                await delay(150);
+                
+                // Trata Habilidades de Suporte/Cura do Inimigo
+                if (usedSkill && usedSkill.type === 'heal') {
+                    const healAmount = Math.floor(currentMonster.maxHp * usedSkill.mult);
+                    currentMonster.hp = Math.min(currentMonster.maxHp, currentMonster.hp + healAmount);
+                    addLog(`${currentMonster.name} recuperou ${healAmount} de HP!`, 'text-green-400');
+                    updateMonsterUI();
+                    await delay(300);
+                    ui.mSprite.classList.remove('anim-attack-m');
+                    return; 
+                } else if (usedSkill && usedSkill.type === 'summon') {
+                    applyStatus(currentMonster, 'shield', 3);
+                    const shieldHp = Math.floor(currentMonster.maxHp * usedSkill.mult);
+                    currentMonster.hp += shieldHp; // HP extra simulando o lacaio bloqueando
+                    addLog(`Um lacaio bloqueou o caminho! (+${shieldHp} HP Extra)`, 'text-yellow-400');
+                    updateMonsterUI();
+                    await delay(300);
+                    ui.mSprite.classList.remove('anim-attack-m');
+                    return;
+                } else if (usedSkill && usedSkill.type === 'status' && ['shield'].includes(usedSkill.effect)) {
+                    applyStatus(currentMonster, usedSkill.effect, usedSkill.duration);
+                    addLog(`${currentMonster.name} aumentou sua defesa!`, 'text-purple-400');
+                    await delay(300);
+                    ui.mSprite.classList.remove('anim-attack-m');
+                    return;
+                }
+
+                ui.pSprite.classList.add('anim-damage');
+                
+                // Escalonamento do monstro
+                let attackPower = currentMonster.attack + (player.level * player.level * 2);
+                attackPower *= getAtkMultiplier(currentMonster);
+                attackPower *= getDefMultiplier(player);
+
+                if (usedSkill && usedSkill.type === 'attack') {
+                    attackPower *= usedSkill.mult; // Ataque crítico
+                }
+                
+                const variance = Math.floor(Math.random() * 10) - 5;
+                const damage = Math.max(1, Math.floor(attackPower + variance));
+                
+                player.hp = Math.max(0, player.hp - damage);
+                addLog(`Você recebeu ${damage} de dano!`, 'text-red-400');
+                
+                if (usedSkill && usedSkill.type === 'lifesteal') {
+                    currentMonster.hp = Math.min(currentMonster.maxHp, currentMonster.hp + damage);
+                    addLog(`${currentMonster.name} roubou sua energia vital!`, 'text-green-400');
+                    updateMonsterUI();
+                }
+
+                updatePlayerUI();
+
+                // Aplica status
+                if (usedSkill && usedSkill.type === 'status' && !['shield'].includes(usedSkill.effect)) {
+                    applyStatus(player, usedSkill.effect, usedSkill.duration);
+                    addLog(`O ${currentMonster.name} te infligiu ${statusNamesPt[usedSkill.effect]}!`, 'text-purple-400');
+                } else if (!usedSkill && Math.random() < 0.10) {
+                    const randomStatus = ['burn', 'bleed', 'weaken'][Math.floor(Math.random() * 3)];
+                    applyStatus(player, randomStatus, 2);
+                    addLog(`O ${currentMonster.name} te infligiu ${statusNamesPt[randomStatus]}!`, 'text-purple-400');
+                }
+
+                await delay(300);
+                ui.mSprite.classList.remove('anim-attack-m');
+                ui.pSprite.classList.remove('anim-damage');
+            }
+
+            if (player.hp <= 0) {
+                await delay(500);
+                showGameOver();
+            }
+        }
+
+        function applyStatus(target, type, duration) {
+            const existing = target.statuses.find(s => s.type === type);
+            if (existing) {
+                existing.duration = Math.max(existing.duration, duration);
+            } else {
+                target.statuses.push({ type, duration });
+            }
+            renderStatuses();
+        }
+
+        function getDefMultiplier(entity) {
+            return entity.statuses.some(s => s.type === 'shield') ? 0.5 : 1;
+        }
+
+        function getAtkMultiplier(entity) {
+            return entity.statuses.some(s => s.type === 'weaken') ? 0.5 : 1;
+        }
+
+        async function processStatuses(entity, isPlayer) {
+            let canAct = true;
+            if (!entity.statuses || entity.statuses.length === 0) return canAct;
+
+            for (let i = entity.statuses.length - 1; i >= 0; i--) {
+                const status = entity.statuses[i];
+                let statusMsg = '';
+                const name = isPlayer ? 'Você' : entity.name;
+                
+                if (status.type === 'burn') {
+                    const dmg = Math.floor(15 + (player.level * 15));
+                    entity.hp = Math.max(0, entity.hp - dmg);
+                    statusMsg = `${name} sofreu ${dmg} de dano de Fogo! 🔥`;
+                } else if (status.type === 'bleed') {
+                    const dmg = Math.floor(10 + (player.level * 12));
+                    entity.hp = Math.max(0, entity.hp - dmg);
+                    statusMsg = `${name} sofreu ${dmg} de Sangramento! 🩸`;
+                } else if (status.type === 'poison') {
+                    const dmg = Math.floor(20 + (player.level * 18));
+                    entity.hp = Math.max(0, entity.hp - dmg);
+                    statusMsg = `${name} sofreu ${dmg} de dano de Veneno! 🤢`;
+                } else if (status.type === 'freeze') {
+                    canAct = false;
+                    statusMsg = `${name} está congelado(a) e não pode agir! ❄️`;
+                } else if (status.type === 'paralyze') {
+                    canAct = false;
+                    statusMsg = `${name} está paralisado(a)! ⚡`;
+                } else if (status.type === 'regen') {
+                    const heal = Math.floor(30 + (player.level * 20));
+                    entity.hp = Math.min(entity.maxHp, entity.hp + heal);
+                    statusMsg = `${name} regenerou ${heal} de HP! ✨`;
+                } else if (status.type === 'blind') {
+                    statusMsg = `${name} está com a visão nublada (Erra mais ataques)! 👁️`;
+                }
+
+                if (statusMsg) {
+                    addLog(statusMsg, isPlayer ? 'text-green-300' : 'text-orange-400');
+                    if (isPlayer) updatePlayerUI(); else updateMonsterUI();
+                    await delay(500);
+                }
+
+                status.duration--;
+                if (status.duration <= 0) {
+                    entity.statuses.splice(i, 1);
+                }
+            }
+            renderStatuses();
+            return canAct;
+        }
+
+        function renderStatuses() {
+            const pStatus = document.getElementById('player-status');
+            const mStatus = document.getElementById('monster-status');
+            
+            const mapHtml = s => `
+                <span class="relative inline-block mx-1" title="${statusNamesPt[s.type]}">
+                    ${statusIcons[s.type]}
+                    <span class="absolute -bottom-1 -right-1 text-[8px] bg-black bg-opacity-80 rounded-full w-4 h-4 flex items-center justify-center text-white border border-gray-600">${s.duration}</span>
+                </span>`;
+            
+            pStatus.innerHTML = (player.statuses || []).map(mapHtml).join('');
+            mStatus.innerHTML = (currentMonster?.statuses || []).map(mapHtml).join('');
+        }
+
+        async function checkMonsterDeath() {
+            if (currentMonster.hp <= 0) {
+                addLog(`Você derrotou o ${currentMonster.name}!`, 'text-yellow-400');
+                player.monstersDefeated++;
+                levelUp();
+                await delay(1000);
+                monsterIndex++;
+                spawnMonster();
+                return true;
+            }
+            return false;
+        }
+
+        function levelUp() {
+            player.level++;
+            // Aumenta a vida, MAS NÃO CURA TOTALMENTE (Mais difícil)
+            const hpGain = 40 + (player.level * 15); 
+            player.maxHp += hpGain; 
+            player.hp += hpGain; // O jogador só ganha o HP novo
+            
+            addLog(`⚡ Nível ${player.level}! +${hpGain} Max HP. Cuidado, você não foi curado!`, 'text-orange-400 font-bold');
+            ui.pLevel.innerText = player.level;
+            updatePlayerUI();
+
+            // Verifica se desbloqueou magia nova e avisa no log
+            const newSpells = vocabulary.filter(v => v.unlockLevel === player.level);
+            if (newSpells.length > 0) {
+                newSpells.forEach(spell => {
+                    addLog(`✨ NOVA MAGIA: ${spell.pt}! Olhe o Grimório.`, 'text-yellow-300');
+                });
+            }
+        }
+
+        // --- Funções de UI & Utils ---
+
+        function updatePlayerUI() {
+            const percent = (player.hp / player.maxHp) * 100;
+            ui.pHpBar.style.width = `${percent}%`;
+            ui.pHpText.innerText = `${player.hp}/${player.maxHp}`;
+            
+            if (percent > 50) ui.pHpBar.className = 'hp-fill h-full bg-green-500';
+            else if (percent > 20) ui.pHpBar.className = 'hp-fill h-full bg-yellow-500';
+            else ui.pHpBar.className = 'hp-fill h-full bg-red-500';
+        }
+
+        function updateMonsterUI() {
+            if (!currentMonster) return;
+            const percent = (currentMonster.hp / currentMonster.maxHp) * 100;
+            ui.mHpBar.style.width = `${percent}%`;
+            ui.mHpText.innerText = `${currentMonster.hp}/${currentMonster.maxHp}`;
+        }
+
+        function addLog(message, colorClass) {
+            const div = document.createElement('div');
+            div.className = `text-[10px] md:text-xs ${colorClass}`;
+            div.innerHTML = `> ${message}`;
+            ui.log.appendChild(div);
+            ui.log.scrollTop = ui.log.scrollHeight;
+        }
+
+        function showGameOver() {
+            ui.overlayTitle.innerText = "GAME OVER";
+            ui.overlayTitle.className = "text-3xl md:text-5xl mb-4 text-red-500 text-shadow";
+            ui.overlayDesc.innerText = "Sua jornada terminou. Descanse, revise seu Japonês e levante novamente!";
+            ui.finalScore.innerText = `Monstros derrotados: ${player.monstersDefeated} | Nível: ${player.level}`;
+            ui.overlay.classList.remove('hidden');
+            ui.overlay.classList.add('flex');
+        }
+
+        function showVictory() {
+            ui.overlayTitle.innerText = "VITÓRIA ÉPICA!";
+            ui.overlayTitle.className = "text-3xl md:text-5xl mb-4 text-yellow-400 text-shadow";
+            ui.overlayDesc.innerText = "O Rei Demônio caiu perante o seu domínio absoluto da língua Japonesa!";
+            ui.finalScore.innerText = `Monstros derrotados: ${player.monstersDefeated} | Nível Máximo: ${player.level}`;
+            ui.overlay.classList.remove('hidden');
+            ui.overlay.classList.add('flex');
+        }
+
+        function restartGame() {
+            initGame();
+        }
+
+        function delay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        window.onload = initGame;
+
+    </script>
+</body>
+</html>
