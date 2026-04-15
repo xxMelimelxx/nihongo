@@ -51,6 +51,14 @@
             box-shadow: none;
         }
 
+        /* Utilitários de Texto Faltantes */
+        .text-shadow {
+            text-shadow: 2px 2px 0px rgba(0,0,0,0.6);
+        }
+        .text-shadow-md {
+            text-shadow: 3px 3px 0px rgba(0,0,0,0.9);
+        }
+
         /* Health Bar Transitions */
         .hp-fill {
             transition: width 0.3s ease-in-out, background-color 0.3s;
@@ -171,7 +179,7 @@
             </div>
             <div class="flex flex-wrap gap-2 mt-2">
                 <button onclick="adminLevelUp()" class="bg-gray-800 text-[10px] px-2 py-1 rounded text-white hover:bg-gray-700 border border-gray-600">+1 Nível</button>
-                <button onclick="adminMaxLevel()" class="bg-gray-800 text-[10px] px-2 py-1 rounded text-white hover:bg-gray-700 border border-gray-600">Nível 30 (Max)</button>
+                <button onclick="adminMaxLevel()" class="bg-gray-800 text-[10px] px-2 py-1 rounded text-white hover:bg-gray-700 border border-gray-600">Nível 40 (Max)</button>
                 <button onclick="adminGiveXP()" class="bg-gray-800 text-[10px] px-2 py-1 rounded text-white hover:bg-gray-700 border border-gray-600">+1000 XP</button>
                 <button onclick="adminHeal()" class="bg-gray-800 text-[10px] px-2 py-1 rounded text-green-400 hover:bg-gray-700 border border-gray-600">Curar HP</button>
                 <button onclick="adminResetCooldowns()" class="bg-gray-800 text-[10px] px-2 py-1 rounded text-blue-400 hover:bg-gray-700 border border-gray-600">Zerar CDs</button>
@@ -264,7 +272,7 @@
         <!-- Game Over / Victory Screen -->
         <div id="overlay" class="fixed inset-0 bg-black bg-opacity-90 hidden items-center justify-center z-50 p-4">
             <div class="retro-panel p-8 text-center max-w-md w-full">
-                <h2 id="overlay-title" class="text-3xl mb-4 text-red-500">GAME OVER</h2>
+                <h2 id="overlay-title" class="text-3xl md:text-5xl mb-4 text-red-500 text-shadow-md">GAME OVER</h2>
                 <p id="overlay-desc" class="text-sm text-gray-300 mb-6 leading-relaxed">Você foi derrotado. Estude mais e tente novamente!</p>
                 <div class="text-xs text-yellow-400 mb-6" id="final-score">Monstros derrotados: 0</div>
                 <button onclick="restartGame()" class="retro-btn w-full py-4 text-white font-bold tracking-widest">TENTAR NOVAMENTE</button>
@@ -277,7 +285,7 @@
                 <div class="flex justify-between items-center mb-4 border-b-2 border-gray-600 pb-4">
                     <div>
                         <h2 class="text-xl md:text-2xl text-yellow-400 drop-shadow-md">📖 Grimório Arcano</h2>
-                        <p class="text-[10px] text-gray-400 mt-1">Seu Nível Atual: <span id="spellbook-level" class="text-white font-bold">1</span></p>
+                        <p class="text-[10px] text-gray-400 mt-1">Seu Nível Atual: <span id="spellbook-level" class="text-white font-bold">1</span> | Magias Desbloqueadas: <span id="spellbook-counter" class="text-white font-bold">0/90</span></p>
                     </div>
                     <button onclick="closeSpellbook()" class="retro-btn px-4 py-2 text-red-400 hover:text-white border-red-800">FECHAR</button>
                 </div>
@@ -291,104 +299,168 @@
     </div>
 
     <script>
+        /* ================================================================================= */
+        /* =========================== ÁREA DE CONFIGURAÇÃO ================================ */
+        /* ================================================================================= */
+        /* Modifique os valores abaixo para criar suas próprias magias, monstros e desafios! */
+
         // --- Sistema de Elementos para o Grimório ---
         const elementsInfo = {
             fire: { name: 'Fogo', icon: '🔥', color: '#f56565', bg: '#742a2a' },
             water: { name: 'Água & Gelo', icon: '❄️', color: '#63b3ed', bg: '#2a4365' },
             thunder: { name: 'Trovão', icon: '⚡', color: '#f6e05e', bg: '#744210' },
+            wind: { name: 'Vento', icon: '🌪️', color: '#4fd1c5', bg: '#234e52' },
+            nature: { name: 'Natureza', icon: '🌿', color: '#48bb78', bg: '#22543d' },
             physical: { name: 'Físico', icon: '⚔️', color: '#a0aec0', bg: '#2d3748' },
-            light: { name: 'Luz & Cura', icon: '✨', color: '#68d391', bg: '#22543d' },
-            arcane: { name: 'Arcano', icon: '🔮', color: '#b794f4', bg: '#44337a' }
+            light: { name: 'Luz & Cura', icon: '✨', color: '#ed8936', bg: '#7b341e' },
+            arcane: { name: 'Arcano', icon: '🔮', color: '#b794f4', bg: '#44337a' },
+            void: { name: 'Vazio & Tempo', icon: '🌌', color: '#9f7aea', bg: '#322659' }
         };
 
         const statusIcons = { burn: '🔥', bleed: '🩸', freeze: '❄️', paralyze: '⚡', weaken: '💧', shield: '🛡️', regen: '✨', poison: '🤢', blind: '👁️' };
         const statusNamesPt = { burn: 'Queimadura', bleed: 'Sangramento', freeze: 'Congelamento', paralyze: 'Paralisia', weaken: 'Fraqueza', shield: 'Escudo', regen: 'Regeneração', poison: 'Veneno', blind: 'Cegueira' };
 
-        // --- Dicionário Expandido (Com as +10 Magias Complexas) ---
+        // --- DICIONÁRIO MASSIVO (90 Magias) - Inclui Novas Magias de Suporte (Utility) ---
         const vocabulary = [
-            // Nível 1
-            { pt: "Fogo", romaji: "hi", kana: "ひ", kanji: "火", power: 35, type: "attack", element: 'fire', unlockLevel: 1, cooldown: 2, currentCooldown: 0, effect: 'burn', effectChance: 0.20, effectDuration: 2, effectTarget: 'enemy' },
-            { pt: "Água", romaji: "mizu", kana: "みず", kanji: "水", power: 30, type: "attack", element: 'water', unlockLevel: 1, cooldown: 2, currentCooldown: 0, effect: 'weaken', effectChance: 0.20, effectDuration: 2, effectTarget: 'enemy' },
-            { pt: "Espada", romaji: "ken", kana: "けん", kanji: "剣", power: 25, type: "attack", element: 'physical', unlockLevel: 1, cooldown: 0, currentCooldown: 0, scaling: 'low' },
-            { pt: "Defesa", romaji: "bougyo", kana: "ぼうぎょ", kanji: "防御", power: 0, type: "status", element: 'light', unlockLevel: 1, cooldown: 3, currentCooldown: 0, effect: 'shield', effectChance: 0.80, effectDuration: 2, effectTarget: 'self' }, // Power 0, Type Status
+            // NÍVEIS 1 A 5
+            { pt: "Fogo", romaji: "hi", kana: "ひ", kanji: "火", power: 25, type: "attack", element: 'fire', unlockLevel: 1, cooldown: 1, currentCooldown: 0, effect: 'burn', effectChance: 0.10, effectDuration: 2, effectTarget: 'enemy' },
+            { pt: "Água", romaji: "mizu", kana: "みず", kanji: "水", power: 20, type: "attack", element: 'water', unlockLevel: 1, cooldown: 1, currentCooldown: 0, effect: 'weaken', effectChance: 0.10, effectDuration: 2, effectTarget: 'enemy' },
+            { pt: "Árvore", romaji: "ki", kana: "き", kanji: "木", power: 20, type: "attack", element: 'nature', unlockLevel: 1, cooldown: 1, currentCooldown: 0 },
+            { pt: "Espada", romaji: "ken", kana: "けん", kanji: "剣", power: 15, type: "attack", element: 'physical', unlockLevel: 1, cooldown: 0, currentCooldown: 0, scaling: 'low' },
+            { pt: "Vazio", romaji: "mu", kana: "む", kanji: "無", power: 30, type: "attack", element: 'void', unlockLevel: 1, cooldown: 2, currentCooldown: 0 },
+            { pt: "Defesa", romaji: "bougyo", kana: "ぼうぎょ", kanji: "防御", power: 0, type: "status", element: 'light', unlockLevel: 1, cooldown: 3, currentCooldown: 0, effect: 'shield', effectChance: 0.80, effectDuration: 2, effectTarget: 'self' },
             
-            // Nível 2
-            { pt: "Vento", romaji: "kaze", kana: "かぜ", kanji: "風", power: 30, type: "attack", element: 'arcane', unlockLevel: 2, cooldown: 1, currentCooldown: 0 },
-            { pt: "Corte", romaji: "kiri", kana: "きり", kanji: "切り", power: 45, type: "attack", element: 'physical', unlockLevel: 2, cooldown: 3, currentCooldown: 0, effect: 'bleed', effectChance: 0.25, effectDuration: 3, effectTarget: 'enemy' },
-            { pt: "Cura", romaji: "kaifuku", kana: "かいふく", kanji: "回復", power: 60, type: "heal", element: 'light', unlockLevel: 2, cooldown: 5, currentCooldown: 0, effect: 'regen', effectChance: 1.0, effectDuration: 3, effectTarget: 'self' },
+            { pt: "Vento", romaji: "kaze", kana: "かぜ", kanji: "風", power: 35, type: "attack", element: 'wind', unlockLevel: 2, cooldown: 2, currentCooldown: 0, effect: 'bleed', effectChance: 0.15, effectDuration: 2, effectTarget: 'enemy' },
+            { pt: "Raio", romaji: "rai", kana: "らい", kanji: "雷", power: 40, type: "attack", element: 'thunder', unlockLevel: 2, cooldown: 3, currentCooldown: 0 },
+            { pt: "Luz", romaji: "hikari", kana: "ひかり", kanji: "光", power: 35, type: "attack", element: 'light', unlockLevel: 2, cooldown: 2, currentCooldown: 0 },
+            { pt: "Névoa", romaji: "kiri", kana: "きり", kanji: "霧", power: 0, type: "status", element: 'water', unlockLevel: 2, cooldown: 4, currentCooldown: 0, effect: 'blind', effectChance: 0.50, effectDuration: 2, effectTarget: 'enemy' },
             
-            // Nível 3
-            { pt: "Terra", romaji: "tsuchi", kana: "つち", kanji: "土", power: 40, type: "attack", element: 'physical', unlockLevel: 3, cooldown: 2, currentCooldown: 0, effect: 'weaken', effectChance: 0.15, effectDuration: 2, effectTarget: 'enemy' },
-            { pt: "Gelo", romaji: "koori", kana: "こおり", kanji: "氷", power: 50, type: "attack", element: 'water', unlockLevel: 3, cooldown: 4, currentCooldown: 0, effect: 'freeze', effectChance: 0.15, effectDuration: 1, effectTarget: 'enemy' },
-            { pt: "Raio", romaji: "kaminari", kana: "かみなり", kanji: "雷", power: 60, type: "attack", element: 'thunder', unlockLevel: 3, cooldown: 4, currentCooldown: 0, effect: 'paralyze', effectChance: 0.15, effectDuration: 1, effectTarget: 'enemy' },
-            
-            // Nível 4
-            { pt: "Luz", romaji: "hikari", kana: "ひかり", kanji: "光", power: 55, type: "attack", element: 'light', unlockLevel: 4, cooldown: 3, currentCooldown: 0 },
-            { pt: "Estocada", romaji: "tsuki", kana: "つき", kanji: "突き", power: 65, type: "attack", element: 'physical', unlockLevel: 4, cooldown: 3, currentCooldown: 0 },
-            { pt: "Magia", romaji: "mahou", kana: "まほう", kanji: "魔法", power: 80, type: "attack", element: 'arcane', unlockLevel: 4, cooldown: 5, currentCooldown: 0 },
-            
-            // Nível 5
-            { pt: "Escuridão", romaji: "yami", kana: "やみ", kanji: "闇", power: 75, type: "attack", element: 'arcane', unlockLevel: 5, cooldown: 4, currentCooldown: 0, effect: 'bleed', effectChance: 0.20, effectDuration: 3, effectTarget: 'enemy' },
-            { pt: "Magia de Fogo", romaji: "honoo no mahou", kana: "ほのおのまほう", kanji: "炎の魔法", power: 120, type: "attack", element: 'fire', unlockLevel: 5, cooldown: 5, currentCooldown: 0, effect: 'burn', effectChance: 0.40, effectDuration: 3, effectTarget: 'enemy' },
-            
-            // Nível 6
-            { pt: "Dragão de Gelo", romaji: "koori no ryuu", kana: "こおりのりゅう", kanji: "氷の竜", power: 150, type: "attack", element: 'water', unlockLevel: 6, cooldown: 6, currentCooldown: 0, effect: 'freeze', effectChance: 0.35, effectDuration: 2, effectTarget: 'enemy' },
-            
-            // Nível 7
-            { pt: "Tempestade de Raios", romaji: "kaminari no arashi", kana: "かみなりのあらし", kanji: "雷の嵐", power: 160, type: "attack", element: 'thunder', unlockLevel: 7, cooldown: 6, currentCooldown: 0, effect: 'paralyze', effectChance: 0.30, effectDuration: 1, effectTarget: 'enemy' },
-            { pt: "Grande Espada", romaji: "ootachi", kana: "おおたち", kanji: "大太刀", power: 130, type: "attack", element: 'physical', unlockLevel: 7, cooldown: 4, currentCooldown: 0, effect: 'bleed', effectChance: 0.40, effectDuration: 4, effectTarget: 'enemy' },
-            
-            // Nível 8
-            { pt: "Escudo de Gelo", romaji: "koori no tate", kana: "こおりのたて", kanji: "氷の盾", power: 100, type: "heal", element: 'water', unlockLevel: 8, cooldown: 6, currentCooldown: 0, effect: 'shield', effectChance: 1.0, effectDuration: 4, effectTarget: 'self' },
-            { pt: "Cura Suprema", romaji: "kanzen kaifuku", kana: "かんぜんかいふく", kanji: "完全回復", power: 500, type: "heal", element: 'light', unlockLevel: 8, cooldown: 8, currentCooldown: 0, effect: 'regen', effectChance: 1.0, effectDuration: 5, effectTarget: 'self' },
-            
-            // Nível 9
-            { pt: "Ataque Devastador", romaji: "hakai no kougeki", kana: "はかいのこうげき", kanji: "破壊の攻撃", power: 300, type: "attack", element: 'arcane', unlockLevel: 9, cooldown: 8, currentCooldown: 0 },
-            
-            // Nível 10
-            { pt: "Magia de Criação", romaji: "souzou no mahou", kana: "そうぞうのまほう", kanji: "創造の魔法", power: 200, type: "heal", element: 'light', unlockLevel: 10, cooldown: 10, currentCooldown: 0, effect: 'shield', effectChance: 1.0, effectDuration: 5, effectTarget: 'self' },
+            // Nova Magia de Ajuda!
+            { pt: "Sabedoria", romaji: "chie", kana: "ちえ", kanji: "知恵", power: 0, type: "utility", element: 'light', unlockLevel: 3, cooldown: 3, currentCooldown: 0, effect: 'hint', effectChance: 1.0 },
 
-            // Nível 11
-            { pt: "Inferno", romaji: "jigoku", kana: "じごく", kanji: "地獄", power: 400, type: "attack", element: 'fire', unlockLevel: 11, cooldown: 7, currentCooldown: 0, effect: 'burn', effectChance: 0.50, effectDuration: 4, effectTarget: 'enemy' },
+            { pt: "Terra", romaji: "tsuchi", kana: "つち", kanji: "土", power: 50, type: "attack", element: 'physical', unlockLevel: 3, cooldown: 3, currentCooldown: 0, effect: 'weaken', effectChance: 0.20, effectDuration: 2, effectTarget: 'enemy' },
+            { pt: "Céu", romaji: "sora", kana: "そら", kanji: "空", power: 45, type: "attack", element: 'wind', unlockLevel: 3, cooldown: 2, currentCooldown: 0 },
+            { pt: "Gelo", romaji: "koori", kana: "こおり", kanji: "氷", power: 55, type: "attack", element: 'water', unlockLevel: 3, cooldown: 3, currentCooldown: 0, effect: 'freeze', effectChance: 0.20, effectDuration: 1, effectTarget: 'enemy' },
+            { pt: "Flor", romaji: "hana", kana: "はな", kanji: "花", power: 30, type: "heal", element: 'nature', unlockLevel: 3, cooldown: 4, currentCooldown: 0, effect: 'regen', effectChance: 0.50, effectDuration: 3, effectTarget: 'self' },
             
-            // Nível 12
-            { pt: "Espada Sagrada", romaji: "seiken", kana: "せいけん", kanji: "聖剣", power: 450, type: "attack", element: 'physical', unlockLevel: 12, cooldown: 5, currentCooldown: 0 },
+            { pt: "Corte", romaji: "kiri", kana: "きり", kanji: "切り", power: 45, type: "attack", element: 'physical', unlockLevel: 4, cooldown: 1, currentCooldown: 0, effect: 'bleed', effectChance: 0.25, effectDuration: 3, effectTarget: 'enemy' },
+            { pt: "Tempo", romaji: "toki", kana: "とき", kanji: "時", power: 0, type: "status", element: 'void', unlockLevel: 4, cooldown: 5, currentCooldown: 0, effect: 'paralyze', effectChance: 0.40, effectDuration: 1, effectTarget: 'enemy' },
+            { pt: "Noite", romaji: "yoru", kana: "よる", kanji: "夜", power: 60, type: "attack", element: 'void', unlockLevel: 4, cooldown: 3, currentCooldown: 0, effect: 'blind', effectChance: 0.30, effectDuration: 2, effectTarget: 'enemy' },
+            { pt: "Magia", romaji: "mahou", kana: "まほう", kanji: "魔法", power: 75, type: "attack", element: 'arcane', unlockLevel: 4, cooldown: 4, currentCooldown: 0 },
             
-            // Nível 13 (NOVAS COMPLEXAS)
-            { pt: "Dança das Chamas", romaji: "honoo no mai", kana: "ほのおのまい", kanji: "炎の舞", power: 500, type: "attack", element: 'fire', unlockLevel: 13, cooldown: 6, currentCooldown: 0, effect: 'burn', effectChance: 0.60, effectDuration: 3, effectTarget: 'enemy' },
+            { pt: "Chama", romaji: "honoo", kana: "ほのお", kanji: "炎", power: 80, type: "attack", element: 'fire', unlockLevel: 5, cooldown: 3, currentCooldown: 0, effect: 'burn', effectChance: 0.30, effectDuration: 3, effectTarget: 'enemy' },
+            { pt: "Floresta", romaji: "mori", kana: "もり", kanji: "森", power: 65, type: "attack", element: 'nature', unlockLevel: 5, cooldown: 3, currentCooldown: 0, effect: 'poison', effectChance: 0.40, effectDuration: 3, effectTarget: 'enemy' },
+            { pt: "Sombra", romaji: "kage", kana: "かげ", kanji: "影", power: 70, type: "attack", element: 'void', unlockLevel: 5, cooldown: 3, currentCooldown: 0 },
+            { pt: "Cura", romaji: "kaifuku", kana: "かいふく", kanji: "回復", power: 90, type: "heal", element: 'light', unlockLevel: 5, cooldown: 5, currentCooldown: 0, effect: 'regen', effectChance: 1.0, effectDuration: 3, effectTarget: 'self' },
+
+            // NÍVEIS 6 A 10
+            // Nova Magia de Ajuda!
+            { pt: "Purificação", romaji: "jouka", kana: "じょうか", kanji: "浄化", power: 0, type: "utility", element: 'light', unlockLevel: 6, cooldown: 4, currentCooldown: 0, effect: 'cleanse', effectChance: 1.0 },
+
+            { pt: "Estocada", romaji: "tsuki", kana: "つき", kanji: "突き", power: 85, type: "attack", element: 'physical', unlockLevel: 6, cooldown: 2, currentCooldown: 0 },
+            { pt: "Trovão", romaji: "ikazuchi", kana: "いかづち", kanji: "雷", power: 110, type: "attack", element: 'thunder', unlockLevel: 6, cooldown: 4, currentCooldown: 0, effect: 'paralyze', effectChance: 0.25, effectDuration: 1, effectTarget: 'enemy' },
+            { pt: "Veneno", romaji: "doku", kana: "どく", kanji: "毒", power: 40, type: "attack", element: 'nature', unlockLevel: 6, cooldown: 3, currentCooldown: 0, effect: 'poison', effectChance: 0.80, effectDuration: 4, effectTarget: 'enemy' },
             
-            // Nível 14
-            { pt: "Dragão das Trevas", romaji: "yami no ryuu", kana: "やみのりゅう", kanji: "闇の竜", power: 600, type: "attack", element: 'arcane', unlockLevel: 14, cooldown: 8, currentCooldown: 0, effect: 'freeze', effectChance: 0.30, effectDuration: 2, effectTarget: 'enemy' },
+            { pt: "Grama", romaji: "kusa", kana: "くさ", kanji: "草", power: 60, type: "attack", element: 'nature', unlockLevel: 7, cooldown: 2, currentCooldown: 0 },
+            { pt: "Tempestade", romaji: "arashi", kana: "あらし", kanji: "嵐", power: 130, type: "attack", element: 'wind', unlockLevel: 7, cooldown: 4, currentCooldown: 0 },
+            { pt: "Vulcão", romaji: "kazan", kana: "かざん", kanji: "火山", power: 150, type: "attack", element: 'fire', unlockLevel: 7, cooldown: 5, currentCooldown: 0, effect: 'burn', effectChance: 0.40, effectDuration: 3, effectTarget: 'enemy' },
             
-            // Nível 15
-            { pt: "Prisão de Água", romaji: "mizu no rouya", kana: "みずのろうや", kanji: "水の牢屋", power: 650, type: "attack", element: 'water', unlockLevel: 15, cooldown: 7, currentCooldown: 0, effect: 'paralyze', effectChance: 0.60, effectDuration: 2, effectTarget: 'enemy' },
+            { pt: "Escuridão", romaji: "yami", kana: "やみ", kanji: "闇", power: 140, type: "attack", element: 'arcane', unlockLevel: 8, cooldown: 4, currentCooldown: 0, effect: 'blind', effectChance: 0.30, effectDuration: 3, effectTarget: 'enemy' },
+            { pt: "Vácuo", romaji: "shinkuu", kana: "しんくう", kanji: "真空", power: 160, type: "attack", element: 'wind', unlockLevel: 8, cooldown: 4, currentCooldown: 0 },
+            { pt: "Tornado", romaji: "tatsumaki", kana: "たつまき", kanji: "竜巻", power: 155, type: "attack", element: 'wind', unlockLevel: 8, cooldown: 5, currentCooldown: 0, effect: 'bleed', effectChance: 0.30, effectDuration: 3, effectTarget: 'enemy' },
             
-            // Nível 16
-            { pt: "Julgamento Divino", romaji: "kami no sabaki", kana: "かみのさばき", kanji: "神の裁き", power: 800, type: "attack", element: 'light', unlockLevel: 16, cooldown: 10, currentCooldown: 0, effect: 'paralyze', effectChance: 0.50, effectDuration: 2, effectTarget: 'enemy' },
+            // Nova Magia de Ajuda!
+            { pt: "Velocidade", romaji: "kousoku", kana: "こうそく", kanji: "高速", power: 0, type: "utility", element: 'wind', unlockLevel: 9, cooldown: 6, currentCooldown: 0, effect: 'reduce_cd', effectChance: 1.0 },
 
-            // Nível 17
-            { pt: "Trovão Celestial", romaji: "ten no kaminari", kana: "てんのかみなり", kanji: "天の雷", power: 900, type: "attack", element: 'thunder', unlockLevel: 17, cooldown: 8, currentCooldown: 0, effect: 'paralyze', effectChance: 0.70, effectDuration: 2, effectTarget: 'enemy' },
+            { pt: "Espinhos", romaji: "ibara", kana: "いばら", kanji: "茨", power: 120, type: "attack", element: 'nature', unlockLevel: 9, cooldown: 3, currentCooldown: 0, effect: 'bleed', effectChance: 0.50, effectDuration: 3, effectTarget: 'enemy' },
+            { pt: "Espaço-Tempo", romaji: "jikuu", kana: "じくう", kanji: "時空", power: 0, type: "status", element: 'void', unlockLevel: 9, cooldown: 6, currentCooldown: 0, effect: 'paralyze', effectChance: 0.80, effectDuration: 2, effectTarget: 'enemy' },
+            
+            { pt: "Lâmina", romaji: "yaiba", kana: "やいば", kanji: "刃", power: 150, type: "attack", element: 'physical', unlockLevel: 10, cooldown: 2, currentCooldown: 0, effect: 'bleed', effectChance: 0.40, effectDuration: 3, effectTarget: 'enemy' },
+            { pt: "Terremoto", romaji: "jishin", kana: "じしん", kanji: "地震", power: 250, type: "attack", element: 'physical', unlockLevel: 10, cooldown: 6, currentCooldown: 0, effect: 'weaken', effectChance: 0.50, effectDuration: 3, effectTarget: 'enemy' },
 
-            // Nível 18
-            { pt: "Espada Demoníaca", romaji: "maken", kana: "まけん", kanji: "魔剣", power: 1000, type: "attack", element: 'physical', unlockLevel: 18, cooldown: 6, currentCooldown: 0, effect: 'bleed', effectChance: 0.80, effectDuration: 4, effectTarget: 'enemy' },
+            // NÍVEIS 11 A 15
+            { pt: "Magia de Fogo", romaji: "honoo no mahou", kana: "ほのおのまほう", kanji: "炎の魔法", power: 300, type: "attack", element: 'fire', unlockLevel: 11, cooldown: 5, currentCooldown: 0, effect: 'burn', effectChance: 0.50, effectDuration: 3, effectTarget: 'enemy' },
+            { pt: "Vento Divino", romaji: "kamikaze", kana: "かみかぜ", kanji: "神風", power: 320, type: "attack", element: 'wind', unlockLevel: 11, cooldown: 5, currentCooldown: 0 },
+            { pt: "Escudo de Gelo", romaji: "koori no tate", kana: "こおりのたて", kanji: "氷の盾", power: 100, type: "heal", element: 'water', unlockLevel: 11, cooldown: 6, currentCooldown: 0, effect: 'shield', effectChance: 1.0, effectDuration: 4, effectTarget: 'self' },
+            
+            { pt: "Árvore Gigante", romaji: "taiboku", kana: "たいぼく", kanji: "大木", power: 280, type: "attack", element: 'nature', unlockLevel: 12, cooldown: 5, currentCooldown: 0, effect: 'weaken', effectChance: 0.40, effectDuration: 3, effectTarget: 'enemy' },
+            { pt: "Luz Estelar", romaji: "hoshi no hikari", kana: "ほしのひかり", kanji: "星の光", power: 350, type: "attack", element: 'light', unlockLevel: 12, cooldown: 5, currentCooldown: 0 },
+            { pt: "Inferno", romaji: "jigoku", kana: "じごく", kanji: "地獄", power: 450, type: "attack", element: 'fire', unlockLevel: 12, cooldown: 7, currentCooldown: 0, effect: 'burn', effectChance: 0.60, effectDuration: 4, effectTarget: 'enemy' },
 
-            // Nível 19
-            { pt: "Barreira Absoluta", romaji: "zettai bouheki", kana: "ぜったいぼうへき", kanji: "絶対防壁", power: 0, type: "status", element: 'light', unlockLevel: 19, cooldown: 10, currentCooldown: 0, effect: 'shield', effectChance: 1.0, effectDuration: 5, effectTarget: 'self' },
+            { pt: "Ataque Devastador", romaji: "hakai no kougeki", kana: "はかいのこうげき", kanji: "破壊の攻撃", power: 480, type: "attack", element: 'arcane', unlockLevel: 13, cooldown: 6, currentCooldown: 0 },
+            { pt: "Flecha de Água", romaji: "mizu no ya", kana: "みずのや", kanji: "水の矢", power: 380, type: "attack", element: 'water', unlockLevel: 13, cooldown: 4, currentCooldown: 0 },
+            { pt: "Fera das Sombras", romaji: "kage no kemono", kana: "かげのけもの", kanji: "影の獣", power: 420, type: "attack", element: 'void', unlockLevel: 13, cooldown: 6, currentCooldown: 0, effect: 'blind', effectChance: 0.50, effectDuration: 3, effectTarget: 'enemy' },
 
-            // Nível 20
-            { pt: "Chama Negra", romaji: "kuroi honoo", kana: "くろいほのお", kanji: "黒い炎", power: 1200, type: "attack", element: 'arcane', unlockLevel: 20, cooldown: 8, currentCooldown: 0, effect: 'burn', effectChance: 0.80, effectDuration: 5, effectTarget: 'enemy' },
+            // Nova Magia de Ajuda!
+            { pt: "Olho da Verdade", romaji: "shingan", kana: "しんがん", kanji: "心眼", power: 0, type: "utility", element: 'arcane', unlockLevel: 14, cooldown: 7, currentCooldown: 0, effect: 'force_bonus', effectChance: 1.0 },
 
-            // Nível 22
-            { pt: "Tempestade de Neve", romaji: "fubuki", kana: "ふぶき", kanji: "吹雪", power: 1500, type: "attack", element: 'water', unlockLevel: 22, cooldown: 9, currentCooldown: 0, effect: 'freeze', effectChance: 0.60, effectDuration: 3, effectTarget: 'enemy' },
+            { pt: "Grande Espada", romaji: "ootachi", kana: "おおたち", kanji: "大太刀", power: 350, type: "attack", element: 'physical', unlockLevel: 14, cooldown: 3, currentCooldown: 0, effect: 'bleed', effectChance: 0.60, effectDuration: 4, effectTarget: 'enemy' },
+            { pt: "Espada Sagrada", romaji: "seiken", kana: "せいけん", kanji: "聖剣", power: 550, type: "attack", element: 'light', unlockLevel: 14, cooldown: 5, currentCooldown: 0 },
+            { pt: "Chuva de Veneno", romaji: "doku no ame", kana: "どくのあめ", kanji: "毒の雨", power: 300, type: "attack", element: 'nature', unlockLevel: 14, cooldown: 6, currentCooldown: 0, effect: 'poison', effectChance: 0.90, effectDuration: 5, effectTarget: 'enemy' },
 
-            // Nível 24
-            { pt: "Explosão Estelar", romaji: "hoshi no bakuhatsu", kana: "ほしのばくはつ", kanji: "星の爆発", power: 2200, type: "attack", element: 'arcane', unlockLevel: 24, cooldown: 12, currentCooldown: 0 },
+            { pt: "Lâmina de Vento", romaji: "kaze no yaiba", kana: "かぜのやいば", kanji: "風の刃", power: 600, type: "attack", element: 'wind', unlockLevel: 15, cooldown: 5, currentCooldown: 0, effect: 'bleed', effectChance: 0.50, effectDuration: 3, effectTarget: 'enemy' },
+            { pt: "Dragão de Gelo", romaji: "koori no ryuu", kana: "こおりのりゅう", kanji: "氷の竜", power: 750, type: "attack", element: 'water', unlockLevel: 15, cooldown: 7, currentCooldown: 0, effect: 'freeze', effectChance: 0.40, effectDuration: 2, effectTarget: 'enemy' },
 
-            // Nível 25
-            { pt: "Ressurreição", romaji: "fukkatsu", kana: "ふっかつ", kanji: "復活", power: 5000, type: "heal", element: 'light', unlockLevel: 25, cooldown: 15, currentCooldown: 0, effect: 'regen', effectChance: 1.0, effectDuration: 5, effectTarget: 'self' },
+            // NÍVEIS 16 A 25
+            { pt: "Cura Suprema", romaji: "kanzen kaifuku", kana: "かんぜんかいふく", kanji: "完全回復", power: 800, type: "heal", element: 'light', unlockLevel: 16, cooldown: 8, currentCooldown: 0, effect: 'regen', effectChance: 1.0, effectDuration: 5, effectTarget: 'self' },
+            { pt: "Espírito da Floresta", romaji: "mori no seirei", kana: "もりのせいれい", kanji: "森の精霊", power: 600, type: "heal", element: 'nature', unlockLevel: 16, cooldown: 8, currentCooldown: 0, effect: 'shield', effectChance: 1.0, effectDuration: 4, effectTarget: 'self' },
+            { pt: "Garras do Lobo", romaji: "ookami no tsume", kana: "おおかみのつめ", kanji: "狼の爪", power: 700, type: "attack", element: 'physical', unlockLevel: 16, cooldown: 4, currentCooldown: 0 },
 
-            // Nível 30
-            { pt: "Fim do Mundo", romaji: "sekai no owari", kana: "せかいのおわり", kanji: "世界の終わり", power: 8000, type: "attack", element: 'arcane', unlockLevel: 30, cooldown: 20, currentCooldown: 0, effect: 'blind', effectChance: 1.0, effectDuration: 5, effectTarget: 'enemy' }
+            { pt: "Tempestade de Raios", romaji: "kaminari no arashi", kana: "かみなりのあらし", kanji: "雷の嵐", power: 950, type: "attack", element: 'thunder', unlockLevel: 17, cooldown: 7, currentCooldown: 0, effect: 'paralyze', effectChance: 0.40, effectDuration: 2, effectTarget: 'enemy' },
+            { pt: "Dança das Chamas", romaji: "honoo no mai", kana: "ほのおのまい", kanji: "炎の舞", power: 1000, type: "attack", element: 'fire', unlockLevel: 17, cooldown: 6, currentCooldown: 0, effect: 'burn', effectChance: 0.70, effectDuration: 4, effectTarget: 'enemy' },
+
+            { pt: "Magia de Criação", romaji: "souzou no mahou", kana: "そうぞうのまほう", kanji: "創造の魔法", power: 700, type: "heal", element: 'arcane', unlockLevel: 18, cooldown: 10, currentCooldown: 0, effect: 'shield', effectChance: 1.0, effectDuration: 5, effectTarget: 'self' },
+            { pt: "Parada no Tempo", romaji: "jikan no teishi", kana: "じかんのていし", kanji: "時間の停止", power: 0, type: "status", element: 'void', unlockLevel: 18, cooldown: 10, currentCooldown: 0, effect: 'paralyze', effectChance: 1.0, effectDuration: 2, effectTarget: 'enemy' },
+
+            { pt: "Dragão das Trevas", romaji: "yami no ryuu", kana: "やみのりゅう", kanji: "闇の竜", power: 1300, type: "attack", element: 'arcane', unlockLevel: 19, cooldown: 8, currentCooldown: 0, effect: 'blind', effectChance: 0.60, effectDuration: 4, effectTarget: 'enemy' },
+            { pt: "Nevasca Congelante", romaji: "kogoeru fubuki", kana: "こごえるふぶき", kanji: "凍える吹雪", power: 1400, type: "attack", element: 'water', unlockLevel: 19, cooldown: 8, currentCooldown: 0, effect: 'freeze', effectChance: 0.50, effectDuration: 2, effectTarget: 'enemy' },
+
+            { pt: "Lâmina do Vácuo", romaji: "shinkuu no yaiba", kana: "しんくうのやいば", kanji: "真空の刃", power: 1600, type: "attack", element: 'wind', unlockLevel: 20, cooldown: 6, currentCooldown: 0 },
+            { pt: "Prisão de Água", romaji: "mizu no rouya", kana: "みずのろうや", kanji: "水の牢屋", power: 1200, type: "attack", element: 'water', unlockLevel: 20, cooldown: 8, currentCooldown: 0, effect: 'paralyze', effectChance: 0.70, effectDuration: 2, effectTarget: 'enemy' },
+
+            { pt: "Julgamento Divino", romaji: "kami no sabaki", kana: "かみのさばき", kanji: "神の裁き", power: 1900, type: "attack", element: 'light', unlockLevel: 21, cooldown: 10, currentCooldown: 0, effect: 'weaken', effectChance: 0.80, effectDuration: 4, effectTarget: 'enemy' },
+            { pt: "Raízes Devoradoras", romaji: "kuu nekko", kana: "くうねっこ", kanji: "食う根っこ", power: 1500, type: "attack", element: 'nature', unlockLevel: 21, cooldown: 7, currentCooldown: 0, effect: 'poison', effectChance: 0.90, effectDuration: 4, effectTarget: 'enemy' },
+
+            { pt: "Trovão Celestial", romaji: "ten no kaminari", kana: "てんのかみなり", kanji: "天の雷", power: 2200, type: "attack", element: 'thunder', unlockLevel: 22, cooldown: 8, currentCooldown: 0, effect: 'paralyze', effectChance: 0.60, effectDuration: 2, effectTarget: 'enemy' },
+            { pt: "Espada Demoníaca", romaji: "maken", kana: "まけん", kanji: "魔剣", power: 2500, type: "attack", element: 'physical', unlockLevel: 22, cooldown: 7, currentCooldown: 0, effect: 'bleed', effectChance: 0.80, effectDuration: 5, effectTarget: 'enemy' },
+
+            { pt: "Fúria da Tempestade", romaji: "arashi no ikari", kana: "あらしのいかり", kanji: "嵐の怒り", power: 2800, type: "attack", element: 'wind', unlockLevel: 23, cooldown: 9, currentCooldown: 0 },
+            { pt: "Escuridão Infinita", romaji: "mugen no yami", kana: "むげんのやみ", kanji: "無限の闇", power: 3000, type: "attack", element: 'void', unlockLevel: 23, cooldown: 9, currentCooldown: 0, effect: 'blind', effectChance: 0.80, effectDuration: 5, effectTarget: 'enemy' },
+
+            { pt: "Barreira Absoluta", romaji: "zettai bouheki", kana: "ぜったいぼうへき", kanji: "絶対防壁", power: 0, type: "status", element: 'light', unlockLevel: 24, cooldown: 12, currentCooldown: 0, effect: 'shield', effectChance: 1.0, effectDuration: 6, effectTarget: 'self' },
+            { pt: "Chama Negra", romaji: "kuroi honoo", kana: "くろいほのお", kanji: "黒い炎", power: 3400, type: "attack", element: 'fire', unlockLevel: 24, cooldown: 8, currentCooldown: 0, effect: 'burn', effectChance: 0.80, effectDuration: 6, effectTarget: 'enemy' },
+
+            { pt: "Supernova", romaji: "choushinsei", kana: "ちょうしんせい", kanji: "超新星", power: 4500, type: "attack", element: 'arcane', unlockLevel: 25, cooldown: 11, currentCooldown: 0 },
+            { pt: "Ressurreição", romaji: "fukkatsu", kana: "ふっかつ", kanji: "復活", power: 9000, type: "heal", element: 'light', unlockLevel: 25, cooldown: 15, currentCooldown: 0, effect: 'regen', effectChance: 1.0, effectDuration: 5, effectTarget: 'self' },
+
+            // NÍVEIS 26 A 40: Yojijukugo, Epopeias e Cânticos (Mais de 20 letras)
+            { pt: "Ataque Cortante Veloz", romaji: "shippuu jinrai no kengeki", kana: "しっぷうじんらいのけんげき", kanji: "疾風迅雷の剣撃", power: 5500, type: "attack", element: 'physical', unlockLevel: 26, cooldown: 7, currentCooldown: 0 },
+            { pt: "Fogo do Purgatório", romaji: "rengoku no gouka", kana: "れんごくのごうか", kanji: "煉獄の業火", power: 6000, type: "attack", element: 'fire', unlockLevel: 27, cooldown: 9, currentCooldown: 0, effect: 'burn', effectChance: 1.0, effectDuration: 5, effectTarget: 'enemy' },
+            
+            { pt: "Muralha de Gelo Inquebrável", romaji: "fukou fukutsu no hyouheki", kana: "ふこうふくつのひょうへき", kanji: "不撓不屈の氷壁", power: 0, type: "status", element: 'water', unlockLevel: 28, cooldown: 12, currentCooldown: 0, effect: 'shield', effectChance: 1.0, effectDuration: 6, effectTarget: 'self' },
+            { pt: "Ilusão Sombria", romaji: "yami no gen ei", kana: "やみのげんえい", kanji: "闇の幻影", power: 4000, type: "attack", element: 'void', unlockLevel: 28, cooldown: 8, currentCooldown: 0, effect: 'blind', effectChance: 0.80, effectDuration: 4, effectTarget: 'enemy' },
+            { pt: "Oceano da Destruição", romaji: "hakai no daiunabara", kana: "はかいのだいうなばら", kanji: "破壊の大海原", power: 7500, type: "attack", element: 'water', unlockLevel: 29, cooldown: 10, currentCooldown: 0, effect: 'weaken', effectChance: 0.90, effectDuration: 5, effectTarget: 'enemy' },
+
+            { pt: "Dragão Sagrado dos Céus", romaji: "tenkuu no sei ryuu", kana: "てんくうのせいりゅう", kanji: "天空の聖竜", power: 9000, type: "attack", element: 'light', unlockLevel: 30, cooldown: 11, currentCooldown: 0 },
+            { pt: "Árvore do Mundo", romaji: "sekaiju no ishi", kana: "せかいじゅのいし", kanji: "世界樹の意志", power: 8500, type: "heal", element: 'nature', unlockLevel: 31, cooldown: 12, currentCooldown: 0, effect: 'regen', effectChance: 1.0, effectDuration: 8, effectTarget: 'self' },
+            
+            { pt: "Lótus Carmesim Ardente", romaji: "shakunetsu no guren jigoku", kana: "しゃくねつのぐれんじごく", kanji: "灼熱の紅蓮地獄", power: 11000, type: "attack", element: 'fire', unlockLevel: 32, cooldown: 10, currentCooldown: 0, effect: 'burn', effectChance: 1.0, effectDuration: 4, effectTarget: 'enemy' },
+            
+            { pt: "Meteoro da Extinção", romaji: "zetsumetsu no insekigun", kana: "ぜつめつのいんせきぐん", kanji: "絶滅の隕石群", power: 14000, type: "attack", element: 'arcane', unlockLevel: 33, cooldown: 12, currentCooldown: 0 },
+            
+            { pt: "Corte que Divide os Céus", romaji: "tenchi wo saku zangeki", kana: "てんちをさくざんげき", kanji: "天地を裂く斬撃", power: 16000, type: "attack", element: 'physical', unlockLevel: 34, cooldown: 8, currentCooldown: 0, effect: 'bleed', effectChance: 1.0, effectDuration: 6, effectTarget: 'enemy' },
+            
+            { pt: "Tempestade do Caos", romaji: "konton no daiarashi", kana: "こんとんのだいあらし", kanji: "混沌の大嵐", power: 18000, type: "attack", element: 'wind', unlockLevel: 35, cooldown: 11, currentCooldown: 0, effect: 'blind', effectChance: 1.0, effectDuration: 4, effectTarget: 'enemy' },
+            
+            { pt: "Relâmpago do Cataclismo", romaji: "tenpenchii no dai ikazuchi", kana: "てんぺんちいのだいいかづち", kanji: "天変地異の大雷", power: 22000, type: "attack", element: 'thunder', unlockLevel: 36, cooldown: 12, currentCooldown: 0, effect: 'paralyze', effectChance: 0.80, effectDuration: 3, effectTarget: 'enemy' },
+            
+            { pt: "Julgamento Divino Imediato", romaji: "tenbatsu tekimen no shinpan", kana: "てんばつてきめんのしんぱん", kanji: "天罰覿面の審判", power: 26000, type: "attack", element: 'light', unlockLevel: 37, cooldown: 14, currentCooldown: 0, effect: 'weaken', effectChance: 1.0, effectDuration: 5, effectTarget: 'enemy' },
+
+            { pt: "Dragão das Trevas Abissais", romaji: "shin en naru ankoku no ryuu", kana: "しんえんなるあんこくのりゅう", kanji: "深淵なる暗黒の竜", power: 32000, type: "attack", element: 'void', unlockLevel: 38, cooldown: 15, currentCooldown: 0, effect: 'freeze', effectChance: 0.90, effectDuration: 3, effectTarget: 'enemy' },
+            
+            { pt: "Milagre da Vida Eterna", romaji: "eien no inochi no kiseki", kana: "えいえんのいのちのきせき", kanji: "永遠の命の奇跡", power: 50000, type: "heal", element: 'light', unlockLevel: 39, cooldown: 20, currentCooldown: 0, effect: 'regen', effectChance: 1.0, effectDuration: 10, effectTarget: 'self' },
+            
+            { pt: "Colapso de Toda Criação", romaji: "shinrabanshou no kanzen naru houkai", kana: "しんらばんしょうのかんぜんなるほうかい", kanji: "森羅万象の完全なる崩壊", power: 99999, type: "attack", element: 'arcane', unlockLevel: 40, cooldown: 25, currentCooldown: 0, effect: 'blind', effectChance: 1.0, effectDuration: 10, effectTarget: 'enemy' }
         ];
 
         // --- Habilidades dos Inimigos ---
@@ -405,7 +477,7 @@
             'blind': { name: 'Cegueira Obscura', type: 'status', effect: 'blind', duration: 2 }
         };
 
-        // --- Lista Expandida com Recompensa de XP ---
+        // --- Lista de Inimigos Rebalanceada para a Curva até Nv 40 ---
         const monstersList = [
             { name: "Slime", romaji: "suraimu", kana: "すらいむ", kanji: "スライム", emoji: "💧", hp: 120, attack: 15, color: "text-blue-300", skills: ['weaken'], xpReward: 50 },
             { name: "Rato Gigante", romaji: "nezumi", kana: "ねずみ", kanji: "鼠", emoji: "🐀", hp: 250, attack: 25, color: "text-gray-400", skills: ['poison'], xpReward: 80 },
@@ -416,14 +488,19 @@
             { name: "Zumbi", romaji: "zonbi", kana: "ぞんび", kanji: "ゾンビ", emoji: "🧟", hp: 1900, attack: 150, color: "text-green-600", skills: ['poison', 'lifesteal'], xpReward: 600 },
             { name: "Ogro", romaji: "oni", kana: "おに", kanji: "鬼", emoji: "👹", hp: 2500, attack: 200, color: "text-red-400", skills: ['critical', 'shield'], xpReward: 800 },
             { name: "Golem de Pedra", romaji: "gooremu", kana: "ごーれむ", kanji: "ゴーレム", emoji: "🪨", hp: 3500, attack: 260, color: "text-gray-400", skills: ['shield', 'paralyze'], xpReward: 1200 },
-            { name: "Mago Negro", romaji: "kuromadou", kana: "くろまどう", kanji: "黒魔道", emoji: "🧙‍♂️", hp: 4500, attack: 350, color: "text-purple-500", skills: ['burn', 'blind', 'heal'], xpReward: 1800 },
-            { name: "Orc Guerreiro", romaji: "ooku", kana: "おーく", kanji: "オーク", emoji: "🧌", hp: 6000, attack: 450, color: "text-green-700", skills: ['critical', 'summon'], xpReward: 2500 },
-            { name: "Quimera", romaji: "kimera", kana: "きめら", kanji: "キメラ", emoji: "🦁", hp: 8000, attack: 550, color: "text-yellow-600", skills: ['burn', 'poison', 'paralyze'], xpReward: 3500 },
-            { name: "Cavaleiro das Trevas", romaji: "ankokukishi", kana: "あんこくきし", kanji: "暗黒騎士", emoji: "🤺", hp: 10000, attack: 700, color: "text-gray-700", skills: ['lifesteal', 'shield', 'blind'], xpReward: 5000 },
-            { name: "Dragão", romaji: "ryuu", kana: "りゅう", kanji: "竜", emoji: "🐉", hp: 14000, attack: 900, color: "text-red-500", skills: ['burn', 'critical', 'summon'], xpReward: 8000 },
-            { name: "Dragão Ancião", romaji: "koryuu", kana: "こりゅう", kanji: "古竜", emoji: "🦖", hp: 20000, attack: 1200, color: "text-green-800", skills: ['burn', 'paralyze', 'heal', 'summon'], xpReward: 15000 },
-            { name: "Rei Demônio", romaji: "maou", kana: "まおう", kanji: "魔王", emoji: "👾", hp: 35000, attack: 1800, color: "text-purple-600", skills: ['blind', 'lifesteal', 'summon', 'heal', 'critical'], xpReward: 30000 }
+            { name: "Mago Negro", romaji: "kuromadou", kana: "くろまどう", kanji: "黒魔道", emoji: "🧙‍♂️", hp: 5500, attack: 350, color: "text-purple-500", skills: ['burn', 'blind', 'heal'], xpReward: 1800 },
+            { name: "Orc Guerreiro", romaji: "ooku", kana: "おーく", kanji: "オーク", emoji: "🧌", hp: 8000, attack: 450, color: "text-green-700", skills: ['critical', 'summon'], xpReward: 2500 },
+            { name: "Quimera", romaji: "kimera", kana: "きめら", kanji: "キメラ", emoji: "🦁", hp: 12000, attack: 650, color: "text-yellow-600", skills: ['burn', 'poison', 'paralyze'], xpReward: 3500 },
+            { name: "Cavaleiro das Trevas", romaji: "ankokukishi", kana: "あんこくきし", kanji: "暗黒騎士", emoji: "🤺", hp: 18000, attack: 900, color: "text-gray-700", skills: ['lifesteal', 'shield', 'blind'], xpReward: 5000 },
+            { name: "Dragão", romaji: "ryuu", kana: "りゅう", kanji: "竜", emoji: "🐉", hp: 30000, attack: 1300, color: "text-red-500", skills: ['burn', 'critical', 'summon'], xpReward: 8000 },
+            { name: "Dragão Ancião", romaji: "koryuu", kana: "こりゅう", kanji: "古竜", emoji: "🦖", hp: 50000, attack: 2000, color: "text-green-800", skills: ['burn', 'paralyze', 'heal', 'summon'], xpReward: 15000 },
+            { name: "Rei Demônio", romaji: "maou", kana: "まおう", kanji: "魔王", emoji: "👾", hp: 150000, attack: 3500, color: "text-purple-600", skills: ['blind', 'lifesteal', 'summon', 'heal', 'critical'], xpReward: 30000 },
+            { name: "Deus da Destruição", romaji: "hakaishin", kana: "はかいしん", kanji: "破壊神", emoji: "🌌", hp: 500000, attack: 8000, color: "text-white text-shadow-md", skills: ['blind', 'paralyze', 'burn', 'critical', 'lifesteal'], xpReward: 99999 }
         ];
+
+        /* ================================================================================= */
+        /* ======================= FIM DA ÁREA DE CONFIGURAÇÃO ============================= */
+        /* ================================================================================= */
 
         // --- Estado do Jogo ---
         let player = { maxHp: 150, hp: 150, level: 1, xp: 0, maxXp: 100, monstersDefeated: 0, statuses: [] };
@@ -458,6 +535,7 @@
             spellbookOverlay: document.getElementById('spellbook-overlay'),
             spellbookContent: document.getElementById('spellbook-content'),
             spellbookLevel: document.getElementById('spellbook-level'),
+            spellbookCounter: document.getElementById('spellbook-counter'),
             cooldownContainer: document.getElementById('cooldown-container'),
             adminConsole: document.getElementById('admin-console')
         };
@@ -507,7 +585,7 @@
             
             player.statuses = [];
             renderStatuses();
-            ui.mJpName.classList.add('hidden'); // Oculta o nome traduzido no respawn
+            ui.mJpName.classList.add('hidden');
 
             ui.mName.innerText = currentMonster.name;
             ui.mName.className = `text-[10px] md:text-xs mb-1 font-bold ${currentMonster.color} cursor-pointer border-b border-dashed border-red-500 hover:text-red-300`;
@@ -531,7 +609,7 @@
             renderCooldowns();
             
             if (currentMonster) {
-                currentMonster.bonusActive = Math.random() < 0.25; // 25% de chance de abrir brecha
+                currentMonster.bonusActive = Math.random() < 0.25; 
                 updateMonsterUI();
             }
 
@@ -554,18 +632,27 @@
 
         function getEffectDesc(vocab) {
             if (!vocab.effect) return '';
-            const chanceStr = `${Math.round(vocab.effectChance * 100)}% chance de `;
+            
+            let chanceStr = vocab.effectChance < 1.0 ? `${Math.round(vocab.effectChance * 100)}% chance de ` : 'Garante: ';
+            if (vocab.type === 'utility') chanceStr = 'Efeito: ';
+
             const mapDesc = {
                 'burn': 'Queimar (dano)', 'bleed': 'Sangrar (dano)', 'freeze': 'Congelar (pula turno)',
                 'paralyze': 'Paralisar (pula turno)', 'weaken': 'Enfraquecer',
-                'shield': 'Proteger (1/2 dano)', 'regen': 'Regenerar (cura/t)', 'blind': 'Cegar (erra mais)'
+                'shield': 'Proteger (1/2 dano)', 'regen': 'Regenerar (cura/t)', 'blind': 'Cegar (erra)',
+                'poison': 'Envenenar (dano)', 'hint': 'Sugere um feitiço livre', 'cleanse': 'Remove maldições',
+                'reduce_cd': 'Reduz os Cooldowns em 2', 'force_bonus': 'Revela Ponto Fraco (!)'
             };
-            return `<div class="text-[8px] md:text-[10px] mt-1 opacity-80 text-white font-normal tracking-normal">✧ ${chanceStr}${mapDesc[vocab.effect]} (${vocab.effectDuration}t)</div>`;
+            const durationStr = vocab.effectDuration ? ` (${vocab.effectDuration}t)` : '';
+            return `<div class="text-[8px] md:text-[10px] mt-1 opacity-80 text-white font-normal tracking-normal">✧ ${chanceStr}${mapDesc[vocab.effect]}${durationStr}</div>`;
         }
 
         function renderSpellbook() {
             ui.spellbookContent.innerHTML = '';
             ui.spellbookLevel.innerText = player.level;
+            
+            const unlockedCount = vocabulary.filter(v => player.level >= v.unlockLevel).length;
+            ui.spellbookCounter.innerText = `${unlockedCount}/${vocabulary.length}`;
 
             const grouped = {};
             vocabulary.forEach(v => {
@@ -606,6 +693,7 @@
                         let typeColor = 'text-white';
                         if (vocab.type === 'heal') typeColor = 'text-green-300';
                         if (vocab.type === 'status') typeColor = 'text-blue-300';
+                        if (vocab.type === 'utility') typeColor = 'text-purple-300'; // Cor única para Utilidade
 
                         tr.innerHTML = `
                             <td class="w-1/3">
@@ -669,7 +757,6 @@
             let matchedSpell = null;
             let matchedMonster = false;
 
-            // Ordena o dicionário para casar magias maiores primeiro (ex: "honoo no mahou" em vez de só "honoo")
             const sortedVocab = [...vocabulary].sort((a, b) => b.kana.length - a.kana.length);
 
             for (const v of sortedVocab) {
@@ -693,7 +780,6 @@
                         matchedSpell = v;
                         break;
                     } else if (currentMonster) {
-                        // Verifica se o resto digitado bate com o nome do monstro (Bônus!)
                         const restHiragana = window.wanakana ? window.wanakana.toHiragana(rest) : rest;
                         const targetHiragana = window.wanakana ? window.wanakana.toHiragana(currentMonster.kana) : currentMonster.kana;
                         const targetRomaji = currentMonster.romaji.replace(/\s+/g, '');
@@ -734,7 +820,6 @@
                 return; 
             }
 
-            // Sistema de Dano Focado (Combo com Monstro)
             if (matchedMonster && currentMonster.bonusActive) {
                 isBonusAttack = true;
                 currentMonster.bonusActive = false;
@@ -755,11 +840,10 @@
 
             let isDead = false;
             
-            // Calcula chance de erro com base na Cegueira
             let currentMissChance = 0.10; 
             if (player.statuses.some(s => s.type === 'blind')) currentMissChance = 0.50; 
 
-            // Se for ataque ou status (ex: Bougyo), pode errar. Cura Suprema não erra.
+            // Magias de utilidade não podem errar
             const canMiss = (currentVocab.type === 'attack' || currentVocab.type === 'status');
             const missChance = Math.random();
 
@@ -785,15 +869,16 @@
         async function playerAction() {
             let damageMultiplier = 1.0;
             if (isBonusAttack) {
-                damageMultiplier = 2.0; // Dobro de dano por acertar a conjuração no alvo
+                damageMultiplier = 2.0; 
                 addLog(`🎯 FOCO PERFEITO NO ALVO! Dano massivo!`, 'text-yellow-300 font-bold');
             } else {
                 addLog(`Você conjurou ${currentVocab.pt}!`, 'text-blue-300');
             }
 
+            // Ações por tipo de Magia
             if (currentVocab.type === 'heal') {
                 ui.pSprite.classList.add('anim-heal');
-                const healAmount = Math.floor((currentVocab.power + (player.level * 25)) * damageMultiplier); 
+                const healAmount = Math.floor((currentVocab.power + (player.level * 40)) * damageMultiplier); 
                 player.hp = Math.min(player.maxHp, player.hp + healAmount);
                 addLog(`Você recuperou ${healAmount} de vida!`, 'text-green-400');
                 updatePlayerUI();
@@ -802,16 +887,48 @@
                 
             } else if (currentVocab.type === 'status') {
                 ui.pSprite.classList.add('anim-heal');
-                // Não causa dano nem cura vida (ex: Bougyo), apenas foca em aplicar o efeito abaixo
                 await delay(500);
                 ui.pSprite.classList.remove('anim-heal');
                 
-            } else {
+            } else if (currentVocab.type === 'utility') {
+                ui.pSprite.classList.add('anim-heal');
+                await delay(500);
+                ui.pSprite.classList.remove('anim-heal');
+
+                // Lógica dos eefeitos de Utilidade
+                if (currentVocab.effect === 'hint') {
+                    const availableSpells = vocabulary.filter(v => player.level >= v.unlockLevel && v.currentCooldown === 0 && v.type === 'attack');
+                    if (availableSpells.length > 0) {
+                        const hintSpell = availableSpells[Math.floor(Math.random() * availableSpells.length)];
+                        addLog(`💡 Dica: Use 【${hintSpell.pt}】 digitando: ${hintSpell.romaji}`, 'text-yellow-300 font-bold');
+                    } else {
+                        addLog(`💡 Dica: Faça um ataque básico!`, 'text-yellow-300');
+                    }
+                } else if (currentVocab.effect === 'cleanse') {
+                    const badStatuses = ['burn', 'bleed', 'poison', 'weaken', 'blind', 'paralyze'];
+                    player.statuses = player.statuses.filter(s => !badStatuses.includes(s.type));
+                    renderStatuses();
+                    addLog(`✨ Você foi purificado de todas as maldições!`, 'text-green-300 font-bold');
+                } else if (currentVocab.effect === 'reduce_cd') {
+                    vocabulary.forEach(v => {
+                        if (v.currentCooldown > 0) v.currentCooldown = Math.max(0, v.currentCooldown - 2);
+                    });
+                    renderCooldowns();
+                    addLog(`⏳ Seus feitiços recarregaram mais rápido!`, 'text-blue-300 font-bold');
+                } else if (currentVocab.effect === 'force_bonus') {
+                    if (currentMonster) {
+                        currentMonster.bonusActive = true;
+                        updateMonsterUI();
+                        addLog(`👁️ Você encontrou o ponto fraco! (Bônus ativado)`, 'text-yellow-400 font-bold');
+                    }
+                }
+
+            } else { // Attack
                 ui.pSprite.classList.add('anim-attack-p');
                 await delay(150);
                 ui.mSprite.classList.add('anim-damage');
                 
-                let scalingFactor = currentVocab.scaling === 'low' ? (player.level * 5) : (player.level * player.level * 5);
+                let scalingFactor = currentVocab.scaling === 'low' ? (player.level * 5) : (player.level * player.level * 6);
                 let damage = currentVocab.power + scalingFactor;
                 damage *= getAtkMultiplier(player); 
                 damage *= getDefMultiplier(currentMonster); 
@@ -827,15 +944,14 @@
                 ui.mSprite.classList.remove('anim-damage');
             }
 
-            // Aplicação de Status secundários (O Bougyo entra aqui)
-            if (currentVocab.effect) {
+            // Aplica os status nas magias normais (NÃO aplica para utility porque elas já foram resolvidas)
+            if (currentVocab.effect && currentVocab.type !== 'utility') {
                 if (Math.random() < currentVocab.effectChance) {
                     const target = currentVocab.effectTarget === 'self' ? player : currentMonster;
                     applyStatus(target, currentVocab.effect, currentVocab.effectDuration);
                     const targetName = currentVocab.effectTarget === 'self' ? 'Você' : currentMonster.name;
                     addLog(`${targetName} recebeu ${statusNamesPt[currentVocab.effect]}!`, 'text-purple-400 font-bold');
                 } else if (currentVocab.type === 'status') {
-                    // Se era uma magia puramente de status e falhou
                     addLog(`A conjuração de ${currentVocab.pt} falhou e não surtiu efeito!`, 'text-gray-400');
                 }
             }
@@ -894,7 +1010,7 @@
 
                 ui.pSprite.classList.add('anim-damage');
                 
-                let attackPower = currentMonster.attack + (player.level * player.level * 2);
+                let attackPower = currentMonster.attack + (player.level * player.level * 3);
                 attackPower *= getAtkMultiplier(currentMonster);
                 attackPower *= getDefMultiplier(player);
 
@@ -918,7 +1034,7 @@
                     applyStatus(player, usedSkill.effect, usedSkill.duration);
                     addLog(`O ${currentMonster.name} te infligiu ${statusNamesPt[usedSkill.effect]}!`, 'text-purple-400');
                 } else if (!usedSkill && Math.random() < 0.10) {
-                    const randomStatus = ['burn', 'bleed', 'weaken'][Math.floor(Math.random() * 3)];
+                    const randomStatus = ['burn', 'bleed', 'weaken', 'poison'][Math.floor(Math.random() * 4)];
                     applyStatus(player, randomStatus, 2);
                     addLog(`O ${currentMonster.name} te infligiu ${statusNamesPt[randomStatus]}!`, 'text-purple-400');
                 }
@@ -959,15 +1075,15 @@
                 const name = isPlayer ? 'Você' : entity.name;
                 
                 if (status.type === 'burn') {
-                    const dmg = Math.floor(15 + (player.level * 15));
+                    const dmg = Math.floor(15 + (player.level * 18));
                     entity.hp = Math.max(0, entity.hp - dmg);
                     statusMsg = `${name} sofreu ${dmg} de dano de Fogo! 🔥`;
                 } else if (status.type === 'bleed') {
-                    const dmg = Math.floor(10 + (player.level * 12));
+                    const dmg = Math.floor(10 + (player.level * 15));
                     entity.hp = Math.max(0, entity.hp - dmg);
                     statusMsg = `${name} sofreu ${dmg} de Sangramento! 🩸`;
                 } else if (status.type === 'poison') {
-                    const dmg = Math.floor(20 + (player.level * 18));
+                    const dmg = Math.floor(20 + (player.level * 22));
                     entity.hp = Math.max(0, entity.hp - dmg);
                     statusMsg = `${name} sofreu ${dmg} de dano de Veneno! 🤢`;
                 } else if (status.type === 'freeze') {
@@ -977,7 +1093,7 @@
                     canAct = false;
                     statusMsg = `${name} está paralisado(a)! ⚡`;
                 } else if (status.type === 'regen') {
-                    const heal = Math.floor(30 + (player.level * 20));
+                    const heal = Math.floor(30 + (player.level * 25));
                     entity.hp = Math.min(entity.maxHp, entity.hp + heal);
                     statusMsg = `${name} regenerou ${heal} de HP! ✨`;
                 } else if (status.type === 'blind') {
@@ -1019,8 +1135,7 @@
                 updatePlayerUI();
                 await delay(600);
 
-                // Sistema de Nível Baseado em XP
-                while (player.xp >= player.maxXp) {
+                while (player.xp >= player.maxXp && player.level < 40) {
                     player.xp -= player.maxXp;
                     levelUp();
                     await delay(600);
@@ -1037,9 +1152,9 @@
             player.level++;
             player.maxXp = Math.floor(player.maxXp * 1.5) + 50;
             
-            const hpGain = 40 + (player.level * 15); 
+            const hpGain = 50 + (player.level * 20); 
             player.maxHp += hpGain; 
-            player.hp += hpGain; // Ganha HP mas não cura o que perdeu
+            player.hp += hpGain; 
             
             addLog(`⚡ Nível ${player.level}! +${hpGain} Max HP.`, 'text-orange-400 font-bold');
             ui.pLevel.innerText = player.level;
@@ -1056,7 +1171,6 @@
         // --- Funções de UI & Utils ---
 
         function updatePlayerUI() {
-            // HP
             const hpPercent = (player.hp / player.maxHp) * 100;
             ui.pHpBar.style.width = `${hpPercent}%`;
             ui.pHpText.innerText = `${player.hp}/${player.maxHp}`;
@@ -1064,7 +1178,6 @@
             else if (hpPercent > 20) ui.pHpBar.className = 'hp-fill h-full bg-yellow-500';
             else ui.pHpBar.className = 'hp-fill h-full bg-red-500';
 
-            // XP
             const xpPercent = Math.min((player.xp / player.maxXp) * 100, 100);
             ui.pXpBar.style.width = `${xpPercent}%`;
             ui.pXpText.innerText = `${player.xp}/${player.maxXp} XP`;
@@ -1093,7 +1206,7 @@
 
         function showGameOver() {
             ui.overlayTitle.innerText = "GAME OVER";
-            ui.overlayTitle.className = "text-3xl md:text-5xl mb-4 text-red-500 text-shadow";
+            ui.overlayTitle.className = "text-3xl md:text-5xl mb-4 text-red-500 text-shadow-md";
             ui.overlayDesc.innerText = "Sua jornada terminou. Descanse, revise seu Japonês e levante novamente!";
             ui.finalScore.innerText = `Monstros derrotados: ${player.monstersDefeated} | Nível: ${player.level}`;
             ui.overlay.classList.remove('hidden');
@@ -1102,8 +1215,8 @@
 
         function showVictory() {
             ui.overlayTitle.innerText = "VITÓRIA ÉPICA!";
-            ui.overlayTitle.className = "text-3xl md:text-5xl mb-4 text-yellow-400 text-shadow";
-            ui.overlayDesc.innerText = "O Rei Demônio caiu perante o seu domínio absoluto da língua Japonesa!";
+            ui.overlayTitle.className = "text-3xl md:text-5xl mb-4 text-yellow-400 text-shadow-md";
+            ui.overlayDesc.innerText = "Você derrotou o Deus da Destruição e masterizou a língua Japonesa!";
             ui.finalScore.innerText = `Monstros derrotados: ${player.monstersDefeated} | Nível Máximo: ${player.level}`;
             ui.overlay.classList.remove('hidden');
             ui.overlay.classList.add('flex');
@@ -1123,30 +1236,32 @@
         }
 
         function adminLevelUp() {
-            levelUp();
-            addLog("Admin: +1 Nível adicionado.", "text-red-400 font-bold");
+            if (player.level < 40) {
+                levelUp();
+                addLog("Admin: +1 Nível adicionado.", "text-red-400 font-bold");
+            }
         }
 
         function adminMaxLevel() {
-            addLog("Admin: Avançando para o Nível 30...", "text-red-400 font-bold");
-            while(player.level < 30) {
+            addLog("Admin: Avançando para o Nível 40...", "text-red-400 font-bold");
+            while(player.level < 40) {
                 player.level++;
                 player.maxXp = Math.floor(player.maxXp * 1.5) + 50;
-                const hpGain = 40 + (player.level * 15); 
+                const hpGain = 50 + (player.level * 20); 
                 player.maxHp += hpGain; 
                 player.hp += hpGain;
             }
             ui.pLevel.innerText = player.level;
             updatePlayerUI();
-            addLog("Admin: Você agora é Nível 30!", "text-yellow-400 font-bold text-shadow");
+            addLog("Admin: Você agora é Nível 40!", "text-yellow-400 font-bold text-shadow");
         }
 
         async function adminGiveXP() {
-            player.xp += 1000;
-            addLog("Admin: +1000 XP concedidos.", "text-red-400 font-bold");
+            player.xp += 10000;
+            addLog("Admin: +10000 XP concedidos.", "text-red-400 font-bold");
             updatePlayerUI();
             
-            while (player.xp >= player.maxXp) {
+            while (player.xp >= player.maxXp && player.level < 40) {
                 player.xp -= player.maxXp;
                 levelUp();
                 await delay(300);
